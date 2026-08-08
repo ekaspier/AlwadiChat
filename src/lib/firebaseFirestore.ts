@@ -1,408 +1,126 @@
 import {
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
-  doc,
-  setDoc,
-  deleteField,
-  Timestamp,
+collection,
+addDoc,
+query,
+orderBy,
+onSnapshot,
+serverTimestamp
 } from "firebase/firestore";
 
 import { db } from "./firebase";
 
-// =========================================================
-// CHAT ID
-// نفس المحادثة دائماً بين نفس الشخصين
-// =========================================================
-
+// إنشاء معرف ثابت للمحادثة بين شخصين
 function getChatId(
-  uid1: string,
-  uid2: string
+uid1: string,
+uid2: string
 ) {
-  return [uid1, uid2]
-    .sort()
-    .join("_");
+
+return [uid1, uid2]
+.sort()
+.join("_");
+
 }
 
-// =========================================================
-// CHAT DOCUMENT
-// =========================================================
-
-function getChatRef(
-  uid1: string,
-  uid2: string
-) {
-  const chatId = getChatId(
-    uid1,
-    uid2
-  );
-
-  return doc(
-    db,
-    "chats",
-    chatId
-  );
-}
-
-// =========================================================
-// SEND MESSAGE
-//
-// عند إرسال رسالة جديدة:
-// 1. يتم تحديث المحادثة
-// 2. يتم إلغاء حالة المسح الخاصة بالمرسل
-// 3. يتم إضافة الرسالة
-//
-// النتيجة:
-// إذا كان الطرف الآخر يرى نقطة حمراء بسبب Clear Chat
-// فإن النقطة تختفي عندما نرسل رسالة جديدة.
-// =========================================================
-
+// إرسال رسالة نصية أو صورة
 export async function sendMessage(
-  myUid: string,
-  friendUid: string,
-  text: string = "",
-  imageUrl: string | null = null
+
+myUid: string,
+
+friendUid: string,
+
+text: string = "",
+
+imageUrl: string | null = null
+
 ) {
-  const chatId = getChatId(
-    myUid,
-    friendUid
-  );
 
-  const chatRef = doc(
-    db,
-    "chats",
-    chatId
-  );
+const chatId = getChatId(
+myUid,
+friendUid
+);
 
-  await setDoc(
-    chatRef,
-    {
-      members: [
-        myUid,
-        friendUid,
-      ],
+await addDoc(
 
-      updatedAt:
-        serverTimestamp(),
+collection(
+  db,
+  "chats",
+  chatId,
+  "messages"
+),
 
-      clearedAt: {
-        [myUid]:
-          deleteField(),
-      },
-    },
-    {
-      merge: true,
-    }
-  );
+{
 
-  await addDoc(
-    collection(
-      db,
-      "chats",
-      chatId,
-      "messages"
-    ),
-    {
-      text,
-      imageUrl,
-      userId: myUid,
-      createdAt:
-        serverTimestamp(),
-    }
-  );
+  text,
+
+  imageUrl,
+
+  userId: myUid,
+
+  createdAt: serverTimestamp()
+
 }
 
-// =========================================================
-// CLEAR CHAT FOR CURRENT USER
-//
-// لا نحذف الرسائل فعلياً من Firestore.
-//
-// فقط نسجل وقت المسح للمستخدم الحالي.
-//
-// الطرف الآخر سيشاهد نقطة حمراء بجانب اسم هذا المستخدم.
-// =========================================================
 
-export async function clearChatForUser(
-  myUid: string,
-  friendUid: string
-) {
-  const chatRef =
-    getChatRef(
-      myUid,
-      friendUid
-    );
+);
 
-  await setDoc(
-    chatRef,
-    {
-      members: [
-        myUid,
-        friendUid,
-      ],
-
-      updatedAt:
-        serverTimestamp(),
-
-      clearedAt: {
-        [myUid]:
-          serverTimestamp(),
-      },
-    },
-    {
-      merge: true,
-    }
-  );
 }
 
-// =========================================================
-// LISTEN TO MESSAGES
-//
-// يستمع:
-// 1. للرسائل
-// 2. لوقت مسح المستخدم الحالي
-//
-// الرسائل القديمة قبل clearedAt لا تظهر للمستخدم.
-// =========================================================
+// الاستماع للرسائل لحظياً
 
 export function listenToMessages(
-  myUid: string,
-  friendUid: string,
-  callback: any
+
+myUid: string,
+
+friendUid: string,
+
+callback: any
+
 ) {
-  const chatId =
-    getChatId(
-      myUid,
-      friendUid
-    );
 
-  const chatRef =
-    doc(
-      db,
-      "chats",
-      chatId
-    );
+const chatId = getChatId(
+myUid,
+friendUid
+);
 
-  const messagesRef =
-    collection(
-      db,
-      "chats",
-      chatId,
-      "messages"
-    );
+const q = query(
 
-  const q =
-    query(
-      messagesRef,
-      orderBy(
-        "createdAt",
-        "asc"
-      )
-    );
+collection(
+  db,
+  "chats",
+  chatId,
+  "messages"
+),
 
-  let latestMessages: any[] = [];
+orderBy(
+  "createdAt",
+  "asc"
+)
 
-  let clearedAt:
-    | number
-    | null = null;
 
-  // =======================================================
-  // UPDATE DISPLAYED MESSAGES
-  // =======================================================
+);
 
-  function updateVisibleMessages() {
-    const visibleMessages =
-      latestMessages.filter(
-        (message: any) => {
+return onSnapshot(
 
-          if (!clearedAt) {
-            return true;
-          }
+q,
 
-          if (!message.createdAt) {
-            return true;
-          }
+(snapshot)=>{
 
-          let messageTime =
-            0;
 
-          if (
-            message.createdAt
-              instanceof Timestamp
-          ) {
-            messageTime =
-              message.createdAt.toMillis();
-          } else if (
-            typeof message
-              .createdAt
-              ?.toMillis ===
-              "function"
-          ) {
-            messageTime =
-              message.createdAt.toMillis();
-          }
+  const messages = snapshot.docs.map(doc=>({
 
-          if (!messageTime) {
-            return true;
-          }
+    id: doc.id,
 
-          return (
-            messageTime >
-            clearedAt
-          );
-        }
-      );
+    ...doc.data()
 
-    callback(
-      visibleMessages
-    );
-  }
+  }));
 
-  // =======================================================
-  // LISTEN TO CHAT METADATA
-  // =======================================================
 
-  const unsubscribeChat =
-    onSnapshot(
-      chatRef,
-      (snapshot) => {
+  callback(messages);
 
-        if (!snapshot.exists()) {
-          clearedAt = null;
 
-          updateVisibleMessages();
-
-          return;
-        }
-
-        const data =
-          snapshot.data();
-
-        const userClearedAt =
-          data?.clearedAt?.[
-            myUid
-          ];
-
-        if (!userClearedAt) {
-          clearedAt = null;
-        } else if (
-          userClearedAt
-            instanceof Timestamp
-        ) {
-          clearedAt =
-            userClearedAt.toMillis();
-        } else if (
-          typeof userClearedAt
-            ?.toMillis ===
-            "function"
-        ) {
-          clearedAt =
-            userClearedAt.toMillis();
-        } else {
-          clearedAt = null;
-        }
-
-        updateVisibleMessages();
-      }
-    );
-
-  // =======================================================
-  // LISTEN TO MESSAGES
-  // =======================================================
-
-  const unsubscribeMessages =
-    onSnapshot(
-      q,
-      (snapshot) => {
-
-        latestMessages =
-          snapshot.docs.map(
-            (messageDoc) => ({
-              id:
-                messageDoc.id,
-
-              ...messageDoc.data(),
-            })
-          );
-
-        updateVisibleMessages();
-      }
-    );
-
-  // =======================================================
-  // COMBINED UNSUBSCRIBE
-  // =======================================================
-
-  return () => {
-    unsubscribeChat();
-    unsubscribeMessages();
-  };
 }
 
-// =========================================================
-// LISTEN TO CHAT STATUS
-//
-// إذا friendUid مسح المحادثة:
-// clearedByFriend = true
-//
-// إذا friendUid أرسل رسالة جديدة:
-// sendMessage() يحذف clearedAt الخاص به
-// وبالتالي:
-// clearedByFriend = false
-// =========================================================
 
-export function listenToChatStatus(
-  myUid: string,
-  friendUid: string,
-  callback: (
-    status: {
-      clearedByFriend: boolean;
-    }
-  ) => void
-) {
-  const chatId =
-    getChatId(
-      myUid,
-      friendUid
-    );
+);
 
-  const chatRef =
-    doc(
-      db,
-      "chats",
-      chatId
-    );
-
-  return onSnapshot(
-    chatRef,
-    (snapshot) => {
-
-      if (!snapshot.exists()) {
-        callback({
-          clearedByFriend:
-            false,
-        });
-
-        return;
-      }
-
-      const data =
-        snapshot.data();
-
-      const clearedAt =
-        data?.clearedAt;
-
-      const friendCleared =
-        !!clearedAt?.[
-          friendUid
-        ];
-
-      callback({
-        clearedByFriend:
-          friendCleared,
-      });
-    }
-  );
 }

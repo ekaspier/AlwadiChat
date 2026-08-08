@@ -5,50 +5,36 @@ import {
   useState,
 } from "react";
 
-import {
-  useRouter,
-} from "next/navigation";
+import { useRouter } from "next/navigation";
 
-import {
-  signOut,
-} from "firebase/auth";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebaseAuthConfig";
 
-import {
-  auth,
-} from "@/lib/firebaseAuthConfig";
+import { getFriends } from "@/lib/friends";
+import { listenToAuth } from "@/lib/authListener";
 
-import {
-  getFriends,
-} from "@/lib/friends";
+import { useTheme } from "@/components/ThemeProvider";
 
-import {
-  listenToAuth,
-} from "@/lib/authListener";
-
-import {
-  listenToChatStatus,
-} from "@/lib/firebaseFirestore";
-
-import {
-  useTheme,
-} from "@/components/ThemeProvider";
+// =========================================================
+// TYPES
+// =========================================================
 
 type SidebarProps = {
-  setSelectedUser: (
-    user: {
-      id: string;
-      name: string;
-      status: string;
-    }
-  ) => void;
+  setSelectedUser: (user: {
+    id: string;
+    name: string;
+    status: string;
+  }) => void;
 };
+
+// =========================================================
+// SIDEBAR
+// =========================================================
 
 export default function Sidebar({
   setSelectedUser,
 }: SidebarProps) {
-
-  const router =
-    useRouter();
+  const router = useRouter();
 
   const {
     theme,
@@ -70,19 +56,11 @@ export default function Sidebar({
     setMenuOpen,
   ] = useState(false);
 
-  const [
-    clearedChats,
-    setClearedChats,
-  ] = useState<
-    Record<string, boolean>
-  >({});
-
   // =======================================================
   // AUTH
   // =======================================================
 
   useEffect(() => {
-
     const unsubscribe =
       listenToAuth(
         (user: any) => {
@@ -90,9 +68,9 @@ export default function Sidebar({
         }
       );
 
-    return () =>
+    return () => {
       unsubscribe();
-
+    };
   }, []);
 
   // =======================================================
@@ -100,123 +78,53 @@ export default function Sidebar({
   // =======================================================
 
   useEffect(() => {
-
     if (!currentUser) {
       return;
     }
 
     async function loadFriends() {
-
       try {
-
         const data =
           await getFriends(
             currentUser.uid
           );
 
         setFriends(data);
-
       } catch (error) {
-
         console.error(
           "Failed to load friends:",
           error
         );
-
       }
-
     }
 
     loadFriends();
-
   }, [currentUser]);
-
-  // =======================================================
-  // LISTEN TO CLEAR STATUS FOR EVERY FRIEND
-  // =======================================================
-
-  useEffect(() => {
-
-    if (
-      !currentUser ||
-      friends.length === 0
-    ) {
-      return;
-    }
-
-    const unsubscribers =
-      friends.map(
-        (friend: any) => {
-
-          return listenToChatStatus(
-            currentUser.uid,
-            friend.uid,
-            (status) => {
-
-              setClearedChats(
-                (previous) => ({
-                  ...previous,
-
-                  [friend.uid]:
-                    status.clearedByFriend,
-                })
-              );
-
-            }
-          );
-
-        }
-      );
-
-    return () => {
-
-      unsubscribers.forEach(
-        (unsubscribe) => {
-          unsubscribe();
-        }
-      );
-
-    };
-
-  }, [
-    currentUser,
-    friends,
-  ]);
 
   // =======================================================
   // LOGOUT
   // =======================================================
 
   async function handleLogout() {
-
     try {
-
       setMenuOpen(false);
 
       await signOut(auth);
 
-      router.push(
-        "/login"
-      );
-
+      router.push("/login");
     } catch (error) {
-
       console.error(
         "Logout failed:",
         error
       );
-
     }
-
   }
 
   // =======================================================
   // NAVIGATION
   // =======================================================
 
-  function navigate(
-    path: string
-  ) {
+  function navigate(path: string) {
     setMenuOpen(false);
     router.push(path);
   }
@@ -228,7 +136,6 @@ export default function Sidebar({
   function handleSelectFriend(
     friend: any
   ) {
-
     setSelectedUser({
       id: friend.uid,
       name: friend.username,
@@ -243,459 +150,376 @@ export default function Sidebar({
   // =======================================================
 
   function changeTheme(
-    newTheme:
-      | "dark"
-      | "light"
+    newTheme: "dark" | "light"
   ) {
     setTheme(newTheme);
   }
 
+  // =======================================================
+  // UI
+  // =======================================================
+
   return (
-    <>
-      {/* =====================================================
-          SIDEBAR
-      ===================================================== */}
+    <div
+      className="
+        relative
+        h-full
+        min-h-0
+        w-full
+        overflow-hidden
+      "
+    >
+      {/* Ambient background */}
+
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -left-24
+          -top-32
+          h-72
+          w-72
+          rounded-full
+          bg-blue-500/[0.08]
+          blur-3xl
+        "
+      />
+
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -right-32
+          top-1/2
+          h-72
+          w-72
+          rounded-full
+          bg-purple-500/[0.05]
+          blur-3xl
+        "
+      />
+
+      {/* Main */}
 
       <div
         className="
           relative
+          z-10
+          flex
           h-full
-          w-full
-          overflow-hidden
+          min-h-0
+          flex-col
         "
       >
+        {/* Header */}
 
-        {/* Ambient background */}
-
-        <div
+        <header
           className="
-            pointer-events-none
-            absolute
-            -left-24
-            -top-32
-            h-72
-            w-72
-            rounded-full
-            bg-blue-500/[0.08]
-            blur-3xl
-          "
-        />
-
-        <div
-          className="
-            pointer-events-none
-            absolute
-            -right-32
-            top-1/2
-            h-72
-            w-72
-            rounded-full
-            bg-purple-500/[0.05]
-            blur-3xl
-          "
-        />
-
-        {/* Main */}
-
-        <div
-          className="
-            relative
-            z-10
-            flex
-            h-full
-            flex-col
+            shrink-0
+            px-4
+            pb-3
+            pt-4
+            md:px-5
+            md:pt-6
           "
         >
-
-          {/* Header */}
-
-          <header
-            className="
-              shrink-0
-              px-4
-              pb-3
-              pt-4
-              md:px-5
-              md:pt-6
-            "
-          >
-
-            <div
-              className="
-                liquid-glass
-                flex
-                items-center
-                justify-between
-                px-4
-                py-3.5
-              "
-            >
-
-              <div
-                className="
-                  flex
-                  min-w-0
-                  items-center
-                  gap-3
-                "
-              >
-
-                <div
-                  className="
-                    flex
-                    h-10
-                    w-10
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-[14px]
-                    border
-                    border-[var(--glass-border)]
-                    bg-[var(--glass-bg-strong)]
-                    text-lg
-                  "
-                >
-                  💬
-                </div>
-
-                <div className="min-w-0">
-
-                  <h1
-                    className="
-                      truncate
-                      text-base
-                      font-bold
-                    "
-                  >
-                    AlwadiChat
-                  </h1>
-
-                  <p
-                    className="
-                      mt-0.5
-                      text-[11px]
-                      text-[var(--text-muted)]
-                    "
-                  >
-                    دردش مع أصدقائك
-                  </p>
-
-                </div>
-
-              </div>
-
-              <button
-                type="button"
-                onClick={() =>
-                  setMenuOpen(true)
-                }
-                aria-label="فتح القائمة"
-                aria-expanded={
-                  menuOpen
-                }
-                className="
-                  glass-button
-                  flex
-                  h-11
-                  w-11
-                  shrink-0
-                  cursor-pointer
-                  items-center
-                  justify-center
-                  rounded-full
-                  text-xl
-                  active:scale-90
-                "
-              >
-                ☰
-              </button>
-
-            </div>
-
-          </header>
-
-          {/* Friends title */}
-
           <div
             className="
+              liquid-glass
               flex
-              shrink-0
               items-center
               justify-between
-              px-5
-              pb-3
-              pt-4
+              px-4
+              py-3.5
             "
           >
-
-            <div>
-
-              <h2
-                className="
-                  text-lg
-                  font-bold
-                "
-              >
-                الأصدقاء
-              </h2>
-
-              <p
-                className="
-                  mt-0.5
-                  text-xs
-                  text-[var(--text-muted)]
-                "
-              >
-                {friends.length} أصدقاء
-              </p>
-
-            </div>
-
             <div
               className="
-                liquid-glass
                 flex
-                h-8
-                min-w-8
+                min-w-0
                 items-center
-                justify-center
-                rounded-full
-                px-2
-                text-xs
-                text-[var(--text-secondary)]
+                gap-3
               "
             >
-              {friends.length}
-            </div>
-
-          </div>
-
-          {/* Friends */}
-
-          <div
-            className="
-              min-h-0
-              flex-1
-              overflow-y-auto
-              px-4
-              pb-6
-            "
-          >
-
-            {friends.length === 0 ? (
-
               <div
                 className="
-                  liquid-glass
-                  mt-4
-                  p-7
-                  text-center
+                  flex
+                  h-10
+                  w-10
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-[14px]
+                  border
+                  border-[var(--glass-border)]
+                  bg-[var(--glass-bg-strong)]
+                  text-lg
                 "
               >
+                💬
+              </div>
 
-                <div
+              <div className="min-w-0">
+                <h1
                   className="
-                    mx-auto
-                    mb-4
-                    flex
-                    h-16
-                    w-16
-                    items-center
-                    justify-center
-                    rounded-[22px]
-                    border
-                    border-[var(--glass-border)]
-                    bg-[var(--glass-bg-strong)]
-                    text-3xl
+                    truncate
+                    text-base
+                    font-bold
                   "
                 >
-                  👥
-                </div>
-
-                <p className="font-semibold">
-                  لا يوجد أصدقاء بعد
-                </p>
+                  AlwadiChat
+                </h1>
 
                 <p
                   className="
-                    mt-2
-                    text-sm
-                    leading-6
+                    mt-0.5
+                    text-[11px]
                     text-[var(--text-muted)]
                   "
                 >
-                  ابحث عن أشخاص وأرسل
-                  لهم طلب صداقة
+                  دردش مع أصدقائك
                 </p>
-
               </div>
+            </div>
 
-            ) : (
+            <button
+              type="button"
+              onClick={() =>
+                setMenuOpen(true)
+              }
+              aria-label="فتح القائمة"
+              aria-expanded={menuOpen}
+              className="
+                glass-button
+                flex
+                h-11
+                w-11
+                shrink-0
+                cursor-pointer
+                items-center
+                justify-center
+                rounded-full
+                text-xl
+                active:scale-90
+              "
+            >
+              ☰
+            </button>
+          </div>
+        </header>
 
-              <div className="space-y-2">
+        {/* Friends title */}
 
-                {friends.map(
-                  (friend: any) => {
+        <div
+          className="
+            flex
+            shrink-0
+            items-center
+            justify-between
+            px-5
+            pb-3
+            pt-4
+          "
+        >
+          <div>
+            <h2
+              className="
+                text-lg
+                font-bold
+              "
+            >
+              الأصدقاء
+            </h2>
 
-                    const hasCleared =
-                      !!clearedChats[
-                        friend.uid
-                      ];
-
-                    return (
-                      <button
-                        key={
-                          friend.uid
-                        }
-                        type="button"
-                        onClick={() =>
-                          handleSelectFriend(
-                            friend
-                          )
-                        }
-                        className="
-                          glass-button
-                          group
-                          flex
-                          w-full
-                          items-center
-                          gap-3
-                          rounded-[22px]
-                          p-3
-                          text-right
-                        "
-                      >
-
-                        {/* Avatar */}
-
-                        <div
-                          className="
-                            relative
-                            flex
-                            h-12
-                            w-12
-                            shrink-0
-                            items-center
-                            justify-center
-                            rounded-full
-                            border
-                            border-[var(--glass-border)]
-                            bg-[var(--glass-bg-strong)]
-                            font-bold
-                          "
-                        >
-
-                          {friend.username
-                            ? friend.username
-                                .charAt(
-                                  0
-                                )
-                                .toUpperCase()
-                            : "?"}
-
-                          <span
-                            className="
-                              absolute
-                              bottom-0.5
-                              right-0.5
-                              h-3
-                              w-3
-                              rounded-full
-                              border-2
-                              border-[var(--background)]
-                              bg-emerald-400
-                            "
-                          />
-
-                        </div>
-
-                        {/* User info */}
-
-                        <div
-                          className="
-                            min-w-0
-                            flex-1
-                          "
-                        >
-
-                          <div
-                            className="
-                              flex
-                              items-center
-                              gap-2
-                            "
-                          >
-
-                            <p
-                              className="
-                                truncate
-                                font-semibold
-                              "
-                            >
-                              {
-                                friend.username
-                              }
-                            </p>
-
-                            {/* RED DOT */}
-
-                            {hasCleared && (
-                              <span
-                                className="
-                                  h-2.5
-                                  w-2.5
-                                  shrink-0
-                                  rounded-full
-                                  bg-red-500
-                                  shadow-[0_0_10px_rgba(239,68,68,0.75)]
-                                "
-                                aria-label="
-                                  المحادثة ممسوحة
-                                "
-                              />
-                            )}
-
-                          </div>
-
-                          <p
-                            className="
-                              mt-1
-                              text-[11px]
-                              text-emerald-500/80
-                            "
-                          >
-                            متصل الآن
-                          </p>
-
-                        </div>
-
-                        <span
-                          className="
-                            text-lg
-                            text-[var(--text-muted)]
-                          "
-                        >
-                          ‹
-                        </span>
-
-                      </button>
-                    );
-                  }
-                )}
-
-              </div>
-
-            )}
-
+            <p
+              className="
+                mt-0.5
+                text-xs
+                text-[var(--text-muted)]
+              "
+            >
+              {friends.length} أصدقاء
+            </p>
           </div>
 
+          <div
+            className="
+              liquid-glass
+              flex
+              h-8
+              min-w-8
+              items-center
+              justify-center
+              rounded-full
+              px-2
+              text-xs
+              text-[var(--text-secondary)]
+            "
+          >
+            {friends.length}
+          </div>
         </div>
 
+        {/* Friends list */}
+
+        <div
+          className="
+            min-h-0
+            flex-1
+            overflow-y-auto
+            px-4
+            pb-6
+          "
+        >
+          {friends.length === 0 ? (
+            <div
+              className="
+                liquid-glass
+                mt-4
+                p-7
+                text-center
+              "
+            >
+              <div
+                className="
+                  mx-auto
+                  mb-4
+                  flex
+                  h-16
+                  w-16
+                  items-center
+                  justify-center
+                  rounded-[22px]
+                  border
+                  border-[var(--glass-border)]
+                  bg-[var(--glass-bg-strong)]
+                  text-3xl
+                "
+              >
+                👥
+              </div>
+
+              <p className="font-semibold">
+                لا يوجد أصدقاء بعد
+              </p>
+
+              <p
+                className="
+                  mt-2
+                  text-sm
+                  leading-6
+                  text-[var(--text-muted)]
+                "
+              >
+                ابحث عن أشخاص وأرسل لهم طلب صداقة
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {friends.map(
+                (friend: any) => (
+                  <button
+                    key={friend.uid}
+                    type="button"
+                    onClick={() =>
+                      handleSelectFriend(
+                        friend
+                      )
+                    }
+                    className="
+                      glass-button
+                      group
+                      flex
+                      w-full
+                      items-center
+                      gap-3
+                      rounded-[22px]
+                      p-3
+                      text-right
+                    "
+                  >
+                    <div
+                      className="
+                        relative
+                        flex
+                        h-12
+                        w-12
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-full
+                        border
+                        border-[var(--glass-border)]
+                        bg-[var(--glass-bg-strong)]
+                        font-bold
+                      "
+                    >
+                      {friend.username
+                        ? friend.username
+                            .charAt(0)
+                            .toUpperCase()
+                        : "?"}
+
+                      <span
+                        className="
+                          absolute
+                          bottom-0.5
+                          right-0.5
+                          h-3
+                          w-3
+                          rounded-full
+                          border-2
+                          border-[var(--background)]
+                          bg-emerald-400
+                        "
+                      />
+                    </div>
+
+                    <div
+                      className="
+                        min-w-0
+                        flex-1
+                      "
+                    >
+                      <p
+                        className="
+                          truncate
+                          font-semibold
+                        "
+                      >
+                        {friend.username}
+                      </p>
+
+                      <p
+                        className="
+                          mt-1
+                          text-[11px]
+                          text-emerald-500/80
+                        "
+                      >
+                        متصل الآن
+                      </p>
+                    </div>
+
+                    <span
+                      className="
+                        text-lg
+                        text-[var(--text-muted)]
+                      "
+                    >
+                      ‹
+                    </span>
+                  </button>
+                )
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* =====================================================
+      {/* =================================================
           MENU
-      ===================================================== */}
+      ================================================= */}
 
       {menuOpen && (
         <>
@@ -732,6 +556,7 @@ export default function Sidebar({
             "
             dir="rtl"
           >
+            {/* Menu header */}
 
             <div
               className="
@@ -746,9 +571,7 @@ export default function Sidebar({
                 py-5
               "
             >
-
               <div>
-
                 <h2
                   className="
                     text-lg
@@ -768,7 +591,6 @@ export default function Sidebar({
                 >
                   AlwadiChat
                 </p>
-
               </div>
 
               <button
@@ -796,8 +618,9 @@ export default function Sidebar({
               >
                 ×
               </button>
-
             </div>
+
+            {/* Menu content */}
 
             <div
               className="
@@ -807,15 +630,12 @@ export default function Sidebar({
                 p-4
               "
             >
-
               {/* Profile */}
 
               <button
                 type="button"
                 onClick={() =>
-                  navigate(
-                    "/profile"
-                  )
+                  navigate("/profile")
                 }
                 className="
                   flex
@@ -835,7 +655,6 @@ export default function Sidebar({
                   active:scale-[0.98]
                 "
               >
-
                 <div
                   className="
                     flex
@@ -858,7 +677,6 @@ export default function Sidebar({
                     flex-1
                   "
                 >
-
                   <p className="font-semibold">
                     الملف الشخصي
                   </p>
@@ -872,13 +690,16 @@ export default function Sidebar({
                   >
                     حسابك ومعلوماتك
                   </p>
-
                 </div>
 
-                <span className="text-lg text-white/30">
+                <span
+                  className="
+                    text-lg
+                    text-white/30
+                  "
+                >
                   ‹
                 </span>
-
               </button>
 
               {/* Search + Requests */}
@@ -891,13 +712,10 @@ export default function Sidebar({
                   gap-3
                 "
               >
-
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(
-                      "/search"
-                    )
+                    navigate("/search")
                   }
                   className="
                     cursor-pointer
@@ -913,7 +731,6 @@ export default function Sidebar({
                     active:scale-[0.98]
                   "
                 >
-
                   <div className="text-xl">
                     🔍
                   </div>
@@ -931,15 +748,12 @@ export default function Sidebar({
                   >
                     ابحث عن أصدقاء
                   </p>
-
                 </button>
 
                 <button
                   type="button"
                   onClick={() =>
-                    navigate(
-                      "/requests"
-                    )
+                    navigate("/requests")
                   }
                   className="
                     cursor-pointer
@@ -955,7 +769,6 @@ export default function Sidebar({
                     active:scale-[0.98]
                   "
                 >
-
                   <div className="text-xl">
                     📩
                   </div>
@@ -973,9 +786,7 @@ export default function Sidebar({
                   >
                     طلبات الصداقة
                   </p>
-
                 </button>
-
               </div>
 
               {/* Appearance */}
@@ -990,7 +801,6 @@ export default function Sidebar({
                   p-4
                 "
               >
-
                 <div
                   className="
                     flex
@@ -998,7 +808,6 @@ export default function Sidebar({
                     gap-4
                   "
                 >
-
                   <div
                     className="
                       flex
@@ -1016,7 +825,6 @@ export default function Sidebar({
                   </div>
 
                   <div>
-
                     <p className="font-semibold">
                       المظهر
                     </p>
@@ -1030,9 +838,7 @@ export default function Sidebar({
                     >
                       اختر شكل التطبيق
                     </p>
-
                   </div>
-
                 </div>
 
                 <div
@@ -1046,13 +852,10 @@ export default function Sidebar({
                     p-1
                   "
                 >
-
                   <button
                     type="button"
                     onClick={() =>
-                      changeTheme(
-                        "dark"
-                      )
+                      changeTheme("dark")
                     }
                     className={`
                       cursor-pointer
@@ -1063,8 +866,7 @@ export default function Sidebar({
                       font-semibold
                       transition
                       ${
-                        theme ===
-                        "dark"
+                        theme === "dark"
                           ? "bg-white/10 text-white shadow-lg"
                           : "text-white/40 hover:bg-white/[0.05]"
                       }
@@ -1076,9 +878,7 @@ export default function Sidebar({
                   <button
                     type="button"
                     onClick={() =>
-                      changeTheme(
-                        "light"
-                      )
+                      changeTheme("light")
                     }
                     className={`
                       cursor-pointer
@@ -1089,8 +889,7 @@ export default function Sidebar({
                       font-semibold
                       transition
                       ${
-                        theme ===
-                        "light"
+                        theme === "light"
                           ? "bg-white text-black shadow-lg"
                           : "text-white/40 hover:bg-white/[0.05]"
                       }
@@ -1098,18 +897,14 @@ export default function Sidebar({
                   >
                     ☀️ فاتح
                   </button>
-
                 </div>
-
               </div>
 
               {/* Logout */}
 
               <button
                 type="button"
-                onClick={
-                  handleLogout
-                }
+                onClick={handleLogout}
                 className="
                   mt-3
                   flex
@@ -1129,7 +924,6 @@ export default function Sidebar({
                   active:scale-[0.98]
                 "
               >
-
                 <div
                   className="
                     flex
@@ -1147,8 +941,12 @@ export default function Sidebar({
                 </div>
 
                 <div className="flex-1">
-
-                  <p className="font-semibold text-red-400">
+                  <p
+                    className="
+                      font-semibold
+                      text-red-400
+                    "
+                  >
                     تسجيل الخروج
                   </p>
 
@@ -1161,16 +959,12 @@ export default function Sidebar({
                   >
                     الخروج من الحساب
                   </p>
-
                 </div>
-
               </button>
-
             </div>
-
           </aside>
         </>
       )}
-    </>
+    </div>
   );
 }

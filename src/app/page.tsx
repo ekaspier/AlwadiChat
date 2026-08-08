@@ -1,24 +1,21 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
-
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import Sidebar from "@/components/Sidebar";
 import ChatWindow from "@/components/ChatWindow";
 
-import {
-  listenToAuth,
-} from "@/lib/authListener";
+import { listenToAuth } from "@/lib/authListener";
 
 import {
   listenToMessages,
   sendMessage as sendFirestoreMessage,
-  clearChatForUser,
 } from "@/lib/firebaseFirestore";
+
+// =========================================================
+// TYPES
+// =========================================================
 
 type SelectedUser = {
   id: string;
@@ -30,38 +27,25 @@ type ChatMessage = {
   id?: string;
   text?: string;
   imageUrl?: string | null;
-  sender:
-    | "me"
-    | "other";
+  sender: "me" | "other";
   time?: string;
 };
 
+// =========================================================
+// HOME
+// =========================================================
+
 export default function Home() {
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  const [
-    currentUser,
-    setCurrentUser,
-  ] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const [
-    selectedUser,
-    setSelectedUser,
-  ] =
-    useState<SelectedUser | null>(
-      null
-    );
+  const [selectedUser, setSelectedUser] =
+    useState<SelectedUser | null>(null);
 
-  const [
-    showChat,
-    setShowChat,
-  ] = useState(false);
+  const [showChat, setShowChat] = useState(false);
 
-  const [
-    messages,
-    setMessages,
-  ] =
+  const [messages, setMessages] =
     useState<ChatMessage[]>([]);
 
   // =======================================================
@@ -69,24 +53,20 @@ export default function Home() {
   // =======================================================
 
   useEffect(() => {
-    const unsubscribe =
-      listenToAuth(
-        (user: any) => {
-
-          if (!user) {
-            router.push(
-              "/login"
-            );
-
-            return;
-          }
-
-          setCurrentUser(user);
+    const unsubscribe = listenToAuth(
+      (user: any) => {
+        if (!user) {
+          router.push("/login");
+          return;
         }
-      );
 
-    return () =>
+        setCurrentUser(user);
+      }
+    );
+
+    return () => {
       unsubscribe();
+    };
   }, [router]);
 
   // =======================================================
@@ -94,69 +74,44 @@ export default function Home() {
   // =======================================================
 
   useEffect(() => {
-
-    if (
-      !currentUser ||
-      !selectedUser
-    ) {
+    if (!currentUser || !selectedUser) {
       setMessages([]);
-
       return;
     }
 
-    const unsubscribe =
-      listenToMessages(
-        currentUser.uid,
-        selectedUser.id,
-        (data: any[]) => {
+    const unsubscribe = listenToMessages(
+      currentUser.uid,
+      selectedUser.id,
+      (data: any[]) => {
+        const formatted: ChatMessage[] =
+          data.map((msg: any) => ({
+            id: msg.id,
+            text: msg.text ?? "",
+            imageUrl: msg.imageUrl ?? null,
 
-          const formatted:
-            ChatMessage[] =
-            data.map(
-              (msg: any) => ({
-                id: msg.id,
+            sender:
+              msg.userId === currentUser.uid
+                ? "me"
+                : "other",
 
-                text:
-                  msg.text ??
-                  "",
+            time: "",
+          }));
 
-                imageUrl:
-                  msg.imageUrl ??
-                  null,
+        setMessages(formatted);
+      }
+    );
 
-                sender:
-                  msg.userId ===
-                  currentUser.uid
-                    ? "me"
-                    : "other",
-
-                time: "",
-              })
-            );
-
-          setMessages(
-            formatted
-          );
-        }
-      );
-
-    return () =>
+    return () => {
       unsubscribe();
-
-  }, [
-    currentUser,
-    selectedUser,
-  ]);
+    };
+  }, [currentUser, selectedUser]);
 
   // =======================================================
   // SELECT FRIEND
   // =======================================================
 
-  function selectUser(
-    user: SelectedUser
-  ) {
+  function selectUser(user: SelectedUser) {
     setSelectedUser(user);
-
     setShowChat(true);
   }
 
@@ -168,11 +123,7 @@ export default function Home() {
     text: string,
     imageUrl: string | null = null
   ) {
-
-    if (
-      !currentUser ||
-      !selectedUser
-    ) {
+    if (!currentUser || !selectedUser) {
       return;
     }
 
@@ -185,26 +136,7 @@ export default function Home() {
   }
 
   // =======================================================
-  // CLEAR CHAT
-  // =======================================================
-
-  async function clearChat() {
-
-    if (
-      !currentUser ||
-      !selectedUser
-    ) {
-      return;
-    }
-
-    await clearChatForUser(
-      currentUser.uid,
-      selectedUser.id
-    );
-  }
-
-  // =======================================================
-  // BACK
+  // BACK ON MOBILE
   // =======================================================
 
   function handleBack() {
@@ -219,28 +151,34 @@ export default function Home() {
     return null;
   }
 
+  // =======================================================
+  // UI
+  // =======================================================
+
   return (
     <main
       className="
         flex
-        h-full
+        h-[100dvh]
         min-h-0
         w-full
         overflow-hidden
+        bg-[var(--background)]
       "
     >
-
-      {/* =====================================================
+      {/* =================================================
           SIDEBAR
-      ===================================================== */}
+      ================================================= */}
 
       <aside
         className={`
           relative
-          z-[100]
+          z-20
           h-full
+          min-h-0
           w-full
           shrink-0
+          md:block
           md:w-[360px]
           lg:w-[390px]
 
@@ -251,18 +189,14 @@ export default function Home() {
           }
         `}
       >
-
         <Sidebar
-          setSelectedUser={
-            selectUser
-          }
+          setSelectedUser={selectUser}
         />
-
       </aside>
 
-      {/* =====================================================
+      {/* =================================================
           CHAT AREA
-      ===================================================== */}
+      ================================================= */}
 
       <section
         className={`
@@ -270,44 +204,33 @@ export default function Home() {
           z-10
           flex
           h-full
+          min-h-0
           min-w-0
           flex-1
+          flex-col
+          overflow-hidden
 
           ${
             showChat
               ? "block"
-              : "hidden md:block"
+              : "hidden md:flex"
           }
         `}
       >
-
         {selectedUser ? (
-
           <ChatWindow
-            user={
-              selectedUser
-            }
-            messages={
-              messages
-            }
-            sendMessage={
-              sendMessage
-            }
-            clearChat={
-              clearChat
-            }
-            back={
-              handleBack
-            }
+            user={selectedUser}
+            messages={messages}
+            sendMessage={sendMessage}
+            back={handleBack}
           />
-
         ) : (
-
           <div
             className="
               relative
               flex
               h-full
+              min-h-0
               w-full
               items-center
               justify-center
@@ -315,7 +238,6 @@ export default function Home() {
               bg-[var(--background)]
             "
           >
-
             {/* Ambient background */}
 
             <div
@@ -356,7 +278,6 @@ export default function Home() {
                 text-center
               "
             >
-
               <div
                 className="
                   mx-auto
@@ -391,14 +312,10 @@ export default function Home() {
               >
                 اختر صديقاً لبدء المحادثة
               </p>
-
             </div>
-
           </div>
         )}
-
       </section>
-
     </main>
   );
 }
