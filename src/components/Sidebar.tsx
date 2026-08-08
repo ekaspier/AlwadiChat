@@ -13,6 +13,8 @@ import { auth } from "@/lib/firebaseAuthConfig";
 import { getFriends } from "@/lib/friends";
 import { listenToAuth } from "@/lib/authListener";
 
+import { clearAllChats } from "@/lib/firebaseFirestore";
+
 import { useTheme } from "@/components/ThemeProvider";
 
 // =========================================================
@@ -54,6 +56,20 @@ export default function Sidebar({
   const [
     menuOpen,
     setMenuOpen,
+  ] = useState(false);
+
+  // =======================================================
+  // DELETE ALL CHATS
+  // =======================================================
+
+  const [
+    showDeleteAllConfirm,
+    setShowDeleteAllConfirm,
+  ] = useState(false);
+
+  const [
+    deletingAllChats,
+    setDeletingAllChats,
   ] = useState(false);
 
   // =======================================================
@@ -156,20 +172,73 @@ export default function Sidebar({
   }
 
   // =======================================================
+  // ASK DELETE ALL
+  // =======================================================
+
+  function askDeleteAllChats() {
+    if (
+      !currentUser ||
+      deletingAllChats
+    ) {
+      return;
+    }
+
+    setMenuOpen(false);
+    setShowDeleteAllConfirm(true);
+  }
+
+  // =======================================================
+  // CONFIRM DELETE ALL
+  // =======================================================
+
+  async function confirmDeleteAllChats() {
+    if (
+      !currentUser ||
+      deletingAllChats
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingAllChats(true);
+
+      const friendUids =
+        friends
+          .map(
+            (friend: any) =>
+              friend.uid
+          )
+          .filter(Boolean);
+
+      await clearAllChats(
+        currentUser.uid,
+        friendUids
+      );
+
+      setShowDeleteAllConfirm(false);
+    } catch (error) {
+      console.error(
+        "Failed to delete all chats:",
+        error
+      );
+
+      alert(
+        "فشل حذف جميع المحادثات"
+      );
+    } finally {
+      setDeletingAllChats(false);
+    }
+  }
+
+  // =======================================================
   // UI
   // =======================================================
 
   return (
-    <div
-      className="
-        relative
-        h-full
-        min-h-0
-        w-full
-        overflow-hidden
-      "
-    >
-      {/* Ambient background */}
+    <>
+      {/* =================================================
+          AMBIENT BACKGROUND
+      ================================================= */}
 
       <div
         className="
@@ -199,7 +268,9 @@ export default function Sidebar({
         "
       />
 
-      {/* Main */}
+      {/* =================================================
+          MAIN
+      ================================================= */}
 
       <div
         className="
@@ -211,7 +282,9 @@ export default function Sidebar({
           flex-col
         "
       >
-        {/* Header */}
+        {/* =================================================
+            HEADER
+        ================================================= */}
 
         <header
           className="
@@ -308,7 +381,9 @@ export default function Sidebar({
           </div>
         </header>
 
-        {/* Friends title */}
+        {/* =================================================
+            FRIENDS TITLE
+        ================================================= */}
 
         <div
           className="
@@ -360,7 +435,9 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Friends list */}
+        {/* =================================================
+            FRIENDS LIST
+        ================================================= */}
 
         <div
           className="
@@ -556,7 +633,9 @@ export default function Sidebar({
             "
             dir="rtl"
           >
-            {/* Menu header */}
+            {/* =================================================
+                MENU HEADER
+            ================================================= */}
 
             <div
               className="
@@ -620,7 +699,9 @@ export default function Sidebar({
               </button>
             </div>
 
-            {/* Menu content */}
+            {/* =================================================
+                MENU CONTENT
+            ================================================= */}
 
             <div
               className="
@@ -630,7 +711,7 @@ export default function Sidebar({
                 p-4
               "
             >
-              {/* Profile */}
+              {/* PROFILE */}
 
               <button
                 type="button"
@@ -702,7 +783,7 @@ export default function Sidebar({
                 </span>
               </button>
 
-              {/* Search + Requests */}
+              {/* SEARCH + REQUESTS */}
 
               <div
                 className="
@@ -789,7 +870,9 @@ export default function Sidebar({
                 </button>
               </div>
 
-              {/* Appearance */}
+              {/* =================================================
+                  APPEARANCE
+              ================================================= */}
 
               <div
                 className="
@@ -900,7 +983,80 @@ export default function Sidebar({
                 </div>
               </div>
 
-              {/* Logout */}
+              {/* =================================================
+                  DELETE ALL CHATS
+              ================================================= */}
+
+              <button
+                type="button"
+                onClick={
+                  askDeleteAllChats
+                }
+                disabled={
+                  deletingAllChats
+                }
+                className="
+                  mt-3
+                  flex
+                  w-full
+                  cursor-pointer
+                  items-center
+                  gap-4
+                  rounded-[22px]
+                  border
+                  border-red-500/15
+                  bg-red-500/[0.07]
+                  p-4
+                  text-right
+                  text-white
+                  transition
+                  hover:bg-red-500/[0.12]
+                  active:scale-[0.98]
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                <div
+                  className="
+                    flex
+                    h-11
+                    w-11
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-[15px]
+                    bg-red-500/10
+                    text-xl
+                  "
+                >
+                  🗑️
+                </div>
+
+                <div className="flex-1">
+                  <p
+                    className="
+                      font-semibold
+                      text-red-400
+                    "
+                  >
+                    حذف جميع المحادثات
+                  </p>
+
+                  <p
+                    className="
+                      mt-1
+                      text-xs
+                      text-red-400/50
+                    "
+                  >
+                    حذف جميع الرسائل نهائياً
+                  </p>
+                </div>
+              </button>
+
+              {/* =================================================
+                  LOGOUT
+              ================================================= */}
 
               <button
                 type="button"
@@ -965,6 +1121,174 @@ export default function Sidebar({
           </aside>
         </>
       )}
-    </div>
+
+      {/* =================================================
+          DELETE ALL CONFIRMATION
+      ================================================= */}
+
+      {showDeleteAllConfirm && (
+        <>
+          {/* BACKDROP */}
+
+          <div
+            className="
+              fixed
+              inset-0
+              z-[100000]
+              bg-black/60
+              backdrop-blur-sm
+            "
+            onClick={() => {
+              if (!deletingAllChats) {
+                setShowDeleteAllConfirm(
+                  false
+                );
+              }
+            }}
+          />
+
+          {/* CONFIRM BOX */}
+
+          <div
+            className="
+              fixed
+              left-1/2
+              top-1/2
+              z-[100001]
+              w-[min(380px,calc(100vw-32px))]
+              -translate-x-1/2
+              -translate-y-1/2
+              rounded-[28px]
+              border
+              border-white/10
+              bg-[#151515]
+              p-6
+              text-white
+              shadow-[0_30px_100px_rgba(0,0,0,0.7)]
+            "
+            dir="rtl"
+          >
+            {/* ICON */}
+
+            <div
+              className="
+                mx-auto
+                flex
+                h-16
+                w-16
+                items-center
+                justify-center
+                rounded-[20px]
+                bg-red-500/10
+                text-3xl
+              "
+            >
+              🗑️
+            </div>
+
+            {/* TITLE */}
+
+            <h3
+              className="
+                mt-5
+                text-center
+                text-lg
+                font-bold
+              "
+            >
+              حذف جميع المحادثات؟
+            </h3>
+
+            {/* DESCRIPTION */}
+
+            <p
+              className="
+                mt-2
+                text-center
+                text-sm
+                leading-6
+                text-white/50
+              "
+            >
+              سيتم حذف جميع الرسائل
+              الموجودة في جميع محادثاتك.
+              <br />
+              <span className="font-semibold text-red-400/80">
+                لا يمكن التراجع عن هذا الإجراء.
+              </span>
+            </p>
+
+            {/* BUTTONS */}
+
+            <div
+              className="
+                mt-6
+                grid
+                grid-cols-2
+                gap-3
+              "
+            >
+              <button
+                type="button"
+                disabled={
+                  deletingAllChats
+                }
+                onClick={() =>
+                  setShowDeleteAllConfirm(
+                    false
+                  )
+                }
+                className="
+                  cursor-pointer
+                  rounded-[16px]
+                  border
+                  border-white/10
+                  bg-white/[0.06]
+                  px-4
+                  py-3
+                  font-semibold
+                  text-white/80
+                  transition
+                  hover:bg-white/[0.10]
+                  active:scale-[0.98]
+                  disabled:cursor-not-allowed
+                  disabled:opacity-40
+                "
+              >
+                إلغاء
+              </button>
+
+              <button
+                type="button"
+                disabled={
+                  deletingAllChats
+                }
+                onClick={
+                  confirmDeleteAllChats
+                }
+                className="
+                  cursor-pointer
+                  rounded-[16px]
+                  bg-red-500
+                  px-4
+                  py-3
+                  font-semibold
+                  text-white
+                  transition
+                  hover:bg-red-600
+                  active:scale-[0.98]
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                {deletingAllChats
+                  ? "جاري الحذف..."
+                  : "حذف الكل"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
   );
 }
