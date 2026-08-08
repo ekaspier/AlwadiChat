@@ -9,10 +9,14 @@ import { auth } from "@/lib/firebaseAuthConfig";
 import { getFriends } from "@/lib/friends";
 import { listenToAuth } from "@/lib/authListener";
 
+import { useTheme } from "@/components/ThemeProvider";
+
 export default function Sidebar({
   setSelectedUser,
 }: any) {
   const router = useRouter();
+
+  const { theme, setTheme } = useTheme();
 
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [friends, setFriends] = useState<any[]>([]);
@@ -65,18 +69,23 @@ export default function Sidebar({
     setMenuOpen(false);
   }
 
+  function changeTheme(newTheme: "dark" | "light") {
+    setTheme(newTheme);
+  }
+
   return (
-    <aside className="relative h-full w-full overflow-hidden bg-black text-white">
+    <aside className="relative h-full w-full overflow-hidden bg-[var(--background)] text-[var(--text-primary)]">
 
       {/* Ambient background */}
+
       <div
         className="
           pointer-events-none
           absolute
           -top-32
           -left-24
-          w-72
           h-72
+          w-72
           rounded-full
           bg-blue-500/[0.08]
           blur-3xl
@@ -89,8 +98,8 @@ export default function Sidebar({
           absolute
           top-1/2
           -right-32
-          w-72
           h-72
+          w-72
           rounded-full
           bg-purple-500/[0.05]
           blur-3xl
@@ -98,36 +107,26 @@ export default function Sidebar({
       />
 
       {/* Main content */}
+
       <div className="relative z-10 flex h-full flex-col">
 
         {/* Header */}
-        <header
-          className="
-            shrink-0
-            px-4
-            pt-4
-            pb-3
-            md:px-5
-            md:pt-6
-          "
-        >
+
+        <header className="shrink-0 px-4 pb-3 pt-4 md:px-5 md:pt-6">
+
           <div
             className="
+              liquid-glass
               flex
               items-center
               justify-between
-              rounded-[24px]
-              border
-              border-white/[0.08]
-              bg-white/[0.055]
               px-4
               py-3.5
-              backdrop-blur-2xl
-              shadow-[0_12px_40px_rgba(0,0,0,0.25)]
             "
           >
 
             {/* Brand */}
+
             <div className="flex min-w-0 items-center gap-3">
 
               <div
@@ -139,9 +138,9 @@ export default function Sidebar({
                   items-center
                   justify-center
                   rounded-[14px]
-                  bg-white/[0.08]
                   border
-                  border-white/[0.08]
+                  border-[var(--glass-border)]
+                  bg-[var(--glass-bg-strong)]
                   text-lg
                 "
               >
@@ -154,7 +153,7 @@ export default function Sidebar({
                   AlwadiChat
                 </h1>
 
-                <p className="mt-0.5 text-[11px] text-white/35">
+                <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
                   دردش مع أصدقائك
                 </p>
 
@@ -162,12 +161,14 @@ export default function Sidebar({
 
             </div>
 
-            {/* Menu button */}
+            {/* Menu */}
+
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
               aria-label="فتح القائمة"
               className="
+                glass-button
                 flex
                 h-11
                 w-11
@@ -175,23 +176,7 @@ export default function Sidebar({
                 items-center
                 justify-center
                 rounded-full
-
-                border
-                border-white/[0.1]
-
-                bg-white/[0.07]
-
-                backdrop-blur-xl
-
                 text-xl
-                text-white/80
-
-                shadow-[0_8px_30px_rgba(0,0,0,0.25)]
-
-                transition-all
-                duration-200
-
-                hover:bg-white/[0.11]
                 active:scale-90
               "
             >
@@ -199,9 +184,11 @@ export default function Sidebar({
             </button>
 
           </div>
+
         </header>
 
         {/* Friends header */}
+
         <div
           className="
             flex
@@ -220,7 +207,7 @@ export default function Sidebar({
               الأصدقاء
             </h2>
 
-            <p className="mt-0.5 text-xs text-white/30">
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
               {friends.length} أصدقاء
             </p>
 
@@ -228,19 +215,16 @@ export default function Sidebar({
 
           <div
             className="
+              liquid-glass
               flex
               h-8
               min-w-8
               items-center
               justify-center
               rounded-full
-              border
-              border-white/[0.08]
-              bg-white/[0.05]
               px-2
               text-xs
-              text-white/50
-              backdrop-blur-xl
+              text-[var(--text-secondary)]
             "
           >
             {friends.length}
@@ -248,16 +232,16 @@ export default function Sidebar({
 
         </div>
 
-        {/* Friends list */}
+        {/* Friends */}
+
         <div
           className="
-            flex-1
             min-h-0
+            flex-1
             overflow-y-auto
             px-4
             pb-6
             overscroll-contain
-
             [scrollbar-width:none]
             [&::-webkit-scrollbar]:hidden
           "
@@ -267,15 +251,10 @@ export default function Sidebar({
 
             <div
               className="
+                liquid-glass
                 mt-4
-                rounded-[28px]
-                border
-                border-white/[0.08]
-                bg-white/[0.045]
                 p-7
                 text-center
-                backdrop-blur-2xl
-                shadow-[0_20px_60px_rgba(0,0,0,0.2)]
               "
             >
 
@@ -289,20 +268,20 @@ export default function Sidebar({
                   items-center
                   justify-center
                   rounded-[22px]
-                  bg-white/[0.07]
                   border
-                  border-white/[0.08]
+                  border-[var(--glass-border)]
+                  bg-[var(--glass-bg-strong)]
                   text-3xl
                 "
               >
                 👥
               </div>
 
-              <p className="font-semibold text-white/70">
+              <p className="font-semibold text-[var(--text-primary)]">
                 لا يوجد أصدقاء بعد
               </p>
 
-              <p className="mt-2 text-sm leading-6 text-white/30">
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 ابحث عن أشخاص وأرسل لهم طلب صداقة
               </p>
 
@@ -319,54 +298,42 @@ export default function Sidebar({
                   type="button"
                   onClick={() => handleSelectFriend(friend)}
                   className="
+                    glass-button
                     group
-                    w-full
                     flex
+                    w-full
                     items-center
                     gap-3
                     rounded-[22px]
-                    border
-                    border-white/[0.055]
-                    bg-white/[0.045]
                     p-3
                     text-right
-
-                    backdrop-blur-xl
-
-                    transition-all
-                    duration-200
-
-                    hover:bg-white/[0.075]
-                    hover:border-white/[0.1]
-
                     active:scale-[0.985]
                   "
                 >
 
                   {/* Avatar */}
+
                   <div
                     className="
                       relative
+                      flex
                       h-12
                       w-12
                       shrink-0
+                      items-center
+                      justify-center
                       overflow-hidden
                       rounded-full
                       border
-                      border-white/[0.1]
-                      bg-white/[0.08]
-                      flex
-                      items-center
-                      justify-center
+                      border-[var(--glass-border)]
+                      bg-[var(--glass-bg-strong)]
                       text-base
                       font-bold
-                      text-white/80
                     "
                   >
+
                     {friend.username
-                      ? friend.username
-                          .charAt(0)
-                          .toUpperCase()
+                      ? friend.username.charAt(0).toUpperCase()
                       : "?"}
 
                     <span
@@ -378,35 +345,32 @@ export default function Sidebar({
                         w-3
                         rounded-full
                         border-2
-                        border-black
+                        border-[var(--background)]
                         bg-emerald-400
                       "
                     />
+
                   </div>
 
-                  {/* User info */}
+                  {/* User */}
+
                   <div className="min-w-0 flex-1">
 
-                    <p className="truncate font-semibold text-white/90">
+                    <p className="truncate font-semibold">
                       {friend.username}
                     </p>
 
-                    <div className="mt-1 flex items-center gap-1.5">
-
-                      <span className="text-[11px] text-emerald-400/80">
-                        متصل الآن
-                      </span>
-
-                    </div>
+                    <p className="mt-1 text-[11px] text-emerald-500/80">
+                      متصل الآن
+                    </p>
 
                   </div>
 
-                  {/* Arrow */}
                   <span
                     className="
                       px-1
                       text-lg
-                      text-white/20
+                      text-[var(--text-muted)]
                       transition-transform
                       duration-200
                       group-hover:-translate-x-1
@@ -427,15 +391,16 @@ export default function Sidebar({
 
       </div>
 
-      {/* Dark overlay */}
+      {/* Overlay */}
+
       <div
         onClick={() => setMenuOpen(false)}
         className={`
           absolute
           inset-0
           z-40
-          bg-black/50
-          backdrop-blur-[2px]
+          bg-black/30
+          backdrop-blur-[4px]
           transition-opacity
           duration-300
 
@@ -448,26 +413,18 @@ export default function Sidebar({
       />
 
       {/* Glass menu */}
+
       <div
         className={`
+          liquid-glass-strong
           absolute
+          bottom-3
           right-3
           top-3
-          bottom-3
           z-50
           w-[min(330px,calc(100%-24px))]
-
+          overflow-y-auto
           rounded-[32px]
-
-          border
-          border-white/[0.12]
-
-          bg-[#111111]/80
-
-          backdrop-blur-3xl
-
-          shadow-[0_25px_80px_rgba(0,0,0,0.55)]
-
           transition-all
           duration-300
           ease-out
@@ -481,6 +438,7 @@ export default function Sidebar({
       >
 
         {/* Menu header */}
+
         <div className="flex items-center justify-between p-4">
 
           <div>
@@ -489,7 +447,7 @@ export default function Sidebar({
               القائمة
             </p>
 
-            <p className="mt-0.5 text-xs text-white/35">
+            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
               AlwadiChat
             </p>
 
@@ -500,18 +458,14 @@ export default function Sidebar({
             onClick={() => setMenuOpen(false)}
             aria-label="إغلاق القائمة"
             className="
+              glass-button
               flex
               h-10
               w-10
               items-center
               justify-center
               rounded-full
-              border
-              border-white/[0.08]
-              bg-white/[0.06]
               text-lg
-              text-white/60
-              transition
               active:scale-90
             "
           >
@@ -521,24 +475,23 @@ export default function Sidebar({
         </div>
 
         {/* Menu content */}
-        <div className="px-3">
+
+        <div className="px-3 pb-5">
+
+          {/* Profile */}
 
           <button
             type="button"
             onClick={() => navigate("/profile")}
             className="
+              glass-button
               flex
               w-full
               items-center
               gap-3
               rounded-[22px]
-              border
-              border-white/[0.06]
-              bg-white/[0.045]
               p-4
               text-right
-              transition
-              hover:bg-white/[0.08]
               active:scale-[0.98]
             "
           >
@@ -553,17 +506,19 @@ export default function Sidebar({
                 الملف الشخصي
               </p>
 
-              <p className="mt-1 text-xs text-white/30">
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
                 حسابك ومعلوماتك
               </p>
 
             </div>
 
-            <span className="text-white/20">
+            <span className="text-[var(--text-muted)]">
               ‹
             </span>
 
           </button>
+
+          {/* Search + Requests */}
 
           <div className="mt-2 grid grid-cols-2 gap-2">
 
@@ -571,14 +526,10 @@ export default function Sidebar({
               type="button"
               onClick={() => navigate("/search")}
               className="
+                glass-button
                 rounded-[22px]
-                border
-                border-white/[0.06]
-                bg-white/[0.045]
                 p-4
                 text-right
-                transition
-                hover:bg-white/[0.08]
                 active:scale-[0.98]
               "
             >
@@ -591,7 +542,7 @@ export default function Sidebar({
                 بحث
               </p>
 
-              <p className="mt-1 text-xs text-white/30">
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
                 ابحث عن أصدقاء
               </p>
 
@@ -601,14 +552,10 @@ export default function Sidebar({
               type="button"
               onClick={() => navigate("/requests")}
               className="
+                glass-button
                 rounded-[22px]
-                border
-                border-white/[0.06]
-                bg-white/[0.045]
                 p-4
                 text-right
-                transition
-                hover:bg-white/[0.08]
                 active:scale-[0.98]
               "
             >
@@ -621,7 +568,7 @@ export default function Sidebar({
                 الطلبات
               </p>
 
-              <p className="mt-1 text-xs text-white/30">
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
                 طلبات الصداقة
               </p>
 
@@ -629,7 +576,103 @@ export default function Sidebar({
 
           </div>
 
+          {/* Appearance */}
+
+          <div
+            className="
+              liquid-glass
+              mt-2
+              rounded-[22px]
+              p-4
+            "
+          >
+
+            <div className="flex items-center gap-3">
+
+              <span className="text-xl">
+                ⚙️
+              </span>
+
+              <div className="flex-1">
+
+                <p className="font-semibold">
+                  المظهر
+                </p>
+
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  اختر شكل التطبيق
+                </p>
+
+              </div>
+
+            </div>
+
+            {/* Theme selector */}
+
+            <div
+              className="
+                mt-4
+                grid
+                grid-cols-2
+                gap-1
+                rounded-[18px]
+                border
+                border-[var(--glass-border)]
+                bg-[var(--glass-bg)]
+                p-1
+              "
+            >
+
+              <button
+                type="button"
+                onClick={() => changeTheme("dark")}
+                className={`
+                  rounded-[14px]
+                  px-3
+                  py-3
+                  text-sm
+                  font-semibold
+                  transition-all
+                  duration-300
+
+                  ${
+                    theme === "dark"
+                      ? "bg-[#151515] text-white shadow-lg"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-strong)]"
+                  }
+                `}
+              >
+                🌙 داكن
+              </button>
+
+              <button
+                type="button"
+                onClick={() => changeTheme("light")}
+                className={`
+                  rounded-[14px]
+                  px-3
+                  py-3
+                  text-sm
+                  font-semibold
+                  transition-all
+                  duration-300
+
+                  ${
+                    theme === "light"
+                      ? "bg-white text-black shadow-lg"
+                      : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-strong)]"
+                  }
+                `}
+              >
+                ☀️ فاتح
+              </button>
+
+            </div>
+
+          </div>
+
           {/* Logout */}
+
           <button
             type="button"
             onClick={handleLogout}
@@ -641,7 +684,7 @@ export default function Sidebar({
               gap-3
               rounded-[22px]
               border
-              border-red-400/[0.1]
+              border-red-500/10
               bg-red-500/[0.07]
               p-4
               text-right
@@ -657,11 +700,11 @@ export default function Sidebar({
 
             <div className="flex-1">
 
-              <p className="font-semibold text-red-300">
+              <p className="font-semibold text-red-500">
                 تسجيل الخروج
               </p>
 
-              <p className="mt-1 text-xs text-red-300/40">
+              <p className="mt-1 text-xs text-red-500/50">
                 الخروج من الحساب
               </p>
 
