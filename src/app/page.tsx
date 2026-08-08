@@ -1,16 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
 import { useRouter } from "next/navigation";
 
 import Sidebar from "@/components/Sidebar";
 import ChatWindow from "@/components/ChatWindow";
 
-import { listenToAuth } from "@/lib/authListener";
+import {
+  listenToAuth,
+} from "@/lib/authListener";
 
 import {
   listenToMessages,
   sendMessage as sendFirestoreMessage,
+  clearChatForUser,
 } from "@/lib/firebaseFirestore";
 
 type SelectedUser = {
@@ -23,90 +30,149 @@ type ChatMessage = {
   id?: string;
   text?: string;
   imageUrl?: string | null;
-  sender: "me" | "other";
+  sender:
+    | "me"
+    | "other";
   time?: string;
 };
 
 export default function Home() {
-  const router = useRouter();
+  const router =
+    useRouter();
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [
+    currentUser,
+    setCurrentUser,
+  ] = useState<any>(null);
 
-  const [selectedUser, setSelectedUser] =
-    useState<SelectedUser | null>(null);
+  const [
+    selectedUser,
+    setSelectedUser,
+  ] =
+    useState<SelectedUser | null>(
+      null
+    );
 
-  const [showChat, setShowChat] = useState(false);
+  const [
+    showChat,
+    setShowChat,
+  ] = useState(false);
 
-  const [messages, setMessages] =
+  const [
+    messages,
+    setMessages,
+  ] =
     useState<ChatMessage[]>([]);
 
-  /*
-   * Authentication
-   */
+  // =======================================================
+  // AUTHENTICATION
+  // =======================================================
+
   useEffect(() => {
-    const unsubscribe = listenToAuth((user: any) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+    const unsubscribe =
+      listenToAuth(
+        (user: any) => {
 
-      setCurrentUser(user);
-    });
+          if (!user) {
+            router.push(
+              "/login"
+            );
 
-    return () => unsubscribe();
+            return;
+          }
+
+          setCurrentUser(user);
+        }
+      );
+
+    return () =>
+      unsubscribe();
   }, [router]);
 
-  /*
-   * Listen to current conversation
-   */
+  // =======================================================
+  // LISTEN TO CURRENT CONVERSATION
+  // =======================================================
+
   useEffect(() => {
-    if (!currentUser || !selectedUser) {
+
+    if (
+      !currentUser ||
+      !selectedUser
+    ) {
       setMessages([]);
+
       return;
     }
 
-    const unsubscribe = listenToMessages(
-      currentUser.uid,
-      selectedUser.id,
-      (data: any[]) => {
-        const formatted: ChatMessage[] = data.map(
-          (msg: any) => ({
-            id: msg.id,
-            text: msg.text ?? "",
-            imageUrl: msg.imageUrl ?? null,
+    const unsubscribe =
+      listenToMessages(
+        currentUser.uid,
+        selectedUser.id,
+        (data: any[]) => {
 
-            sender:
-              msg.userId === currentUser.uid
-                ? "me"
-                : "other",
+          const formatted:
+            ChatMessage[] =
+            data.map(
+              (msg: any) => ({
+                id: msg.id,
 
-            time: "",
-          })
-        );
+                text:
+                  msg.text ??
+                  "",
 
-        setMessages(formatted);
-      }
-    );
+                imageUrl:
+                  msg.imageUrl ??
+                  null,
 
-    return () => unsubscribe();
-  }, [currentUser, selectedUser]);
+                sender:
+                  msg.userId ===
+                  currentUser.uid
+                    ? "me"
+                    : "other",
 
-  /*
-   * Select friend
-   */
-  function selectUser(user: SelectedUser) {
+                time: "",
+              })
+            );
+
+          setMessages(
+            formatted
+          );
+        }
+      );
+
+    return () =>
+      unsubscribe();
+
+  }, [
+    currentUser,
+    selectedUser,
+  ]);
+
+  // =======================================================
+  // SELECT FRIEND
+  // =======================================================
+
+  function selectUser(
+    user: SelectedUser
+  ) {
     setSelectedUser(user);
+
     setShowChat(true);
   }
 
-  /*
-   * Send text or image message
-   */
+  // =======================================================
+  // SEND MESSAGE
+  // =======================================================
+
   async function sendMessage(
     text: string,
     imageUrl: string | null = null
   ) {
-    if (!currentUser || !selectedUser) {
+
+    if (
+      !currentUser ||
+      !selectedUser
+    ) {
       return;
     }
 
@@ -118,43 +184,55 @@ export default function Home() {
     );
   }
 
-  /*
-   * Back to friends on mobile
-   */
+  // =======================================================
+  // CLEAR CHAT
+  // =======================================================
+
+  async function clearChat() {
+
+    if (
+      !currentUser ||
+      !selectedUser
+    ) {
+      return;
+    }
+
+    await clearChatForUser(
+      currentUser.uid,
+      selectedUser.id
+    );
+  }
+
+  // =======================================================
+  // BACK
+  // =======================================================
+
   function handleBack() {
     setShowChat(false);
   }
 
-  /*
-   * Loading
-   */
+  // =======================================================
+  // LOADING
+  // =======================================================
+
   if (!currentUser) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center bg-[var(--background)]">
-        <p className="text-sm text-[var(--text-muted)]">
-          Loading...
-        </p>
-      </main>
-    );
+    return null;
   }
 
   return (
     <main
       className="
-        relative
         flex
-        h-dvh
+        h-full
+        min-h-0
         w-full
         overflow-hidden
-        bg-[var(--background)]
-        text-[var(--foreground)]
       "
     >
-      {/*
-       * =====================================================
-       * SIDEBAR
-       * =====================================================
-       */}
+
+      {/* =====================================================
+          SIDEBAR
+      ===================================================== */}
 
       <aside
         className={`
@@ -173,16 +251,18 @@ export default function Home() {
           }
         `}
       >
+
         <Sidebar
-          setSelectedUser={selectUser}
+          setSelectedUser={
+            selectUser
+          }
         />
+
       </aside>
 
-      {/*
-       * =====================================================
-       * CHAT AREA
-       * =====================================================
-       */}
+      {/* =====================================================
+          CHAT AREA
+      ===================================================== */}
 
       <section
         className={`
@@ -200,14 +280,29 @@ export default function Home() {
           }
         `}
       >
+
         {selectedUser ? (
+
           <ChatWindow
-            user={selectedUser}
-            messages={messages}
-            sendMessage={sendMessage}
-            back={handleBack}
+            user={
+              selectedUser
+            }
+            messages={
+              messages
+            }
+            sendMessage={
+              sendMessage
+            }
+            clearChat={
+              clearChat
+            }
+            back={
+              handleBack
+            }
           />
+
         ) : (
+
           <div
             className="
               relative
@@ -220,6 +315,7 @@ export default function Home() {
               bg-[var(--background)]
             "
           >
+
             {/* Ambient background */}
 
             <div
@@ -260,6 +356,7 @@ export default function Home() {
                 text-center
               "
             >
+
               <div
                 className="
                   mx-auto
@@ -285,13 +382,23 @@ export default function Home() {
                 AlwadiChat
               </h2>
 
-              <p className="mt-2 text-sm text-[var(--text-muted)]">
+              <p
+                className="
+                  mt-2
+                  text-sm
+                  text-[var(--text-muted)]
+                "
+              >
                 اختر صديقاً لبدء المحادثة
               </p>
+
             </div>
+
           </div>
         )}
+
       </section>
+
     </main>
   );
 }
