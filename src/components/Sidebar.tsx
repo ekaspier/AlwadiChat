@@ -13,7 +13,9 @@ import { useTheme } from "@/components/ThemeProvider";
 
 export default function Sidebar({
   setSelectedUser,
-}: any) {
+}: {
+  setSelectedUser: (user: any) => void;
+}) {
   const router = useRouter();
 
   const { theme, setTheme } = useTheme();
@@ -48,6 +50,7 @@ export default function Sidebar({
   async function handleLogout() {
     try {
       await signOut(auth);
+      setMenuOpen(false);
       router.push("/login");
     } catch (error) {
       console.error("Logout failed:", error);
@@ -74,16 +77,15 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="relative h-full w-full overflow-hidden bg-[var(--background)] text-[var(--text-primary)]">
-
+    <aside className="relative h-full w-full overflow-hidden">
       {/* Ambient background */}
 
       <div
         className="
           pointer-events-none
           absolute
-          -top-32
           -left-24
+          -top-32
           h-72
           w-72
           rounded-full
@@ -96,8 +98,8 @@ export default function Sidebar({
         className="
           pointer-events-none
           absolute
-          top-1/2
           -right-32
+          top-1/2
           h-72
           w-72
           rounded-full
@@ -108,12 +110,10 @@ export default function Sidebar({
 
       {/* Main content */}
 
-      <div className="relative z-10 flex h-full flex-col">
-
+      <div className="relative z-10 flex h-full min-h-0 flex-col">
         {/* Header */}
 
         <header className="shrink-0 px-4 pb-3 pt-4 md:px-5 md:pt-6">
-
           <div
             className="
               liquid-glass
@@ -124,11 +124,9 @@ export default function Sidebar({
               py-3.5
             "
           >
-
             {/* Brand */}
 
             <div className="flex min-w-0 items-center gap-3">
-
               <div
                 className="
                   flex
@@ -148,7 +146,6 @@ export default function Sidebar({
               </div>
 
               <div className="min-w-0">
-
                 <h1 className="truncate text-base font-bold">
                   AlwadiChat
                 </h1>
@@ -156,17 +153,16 @@ export default function Sidebar({
                 <p className="mt-0.5 text-[11px] text-[var(--text-muted)]">
                   دردش مع أصدقائك
                 </p>
-
               </div>
-
             </div>
 
-            {/* Menu */}
+            {/* Menu button */}
 
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
               aria-label="فتح القائمة"
+              aria-expanded={menuOpen}
               className="
                 glass-button
                 flex
@@ -182,9 +178,7 @@ export default function Sidebar({
             >
               ☰
             </button>
-
           </div>
-
         </header>
 
         {/* Friends header */}
@@ -200,17 +194,12 @@ export default function Sidebar({
             pt-4
           "
         >
-
           <div>
-
-            <h2 className="text-lg font-bold">
-              الأصدقاء
-            </h2>
+            <h2 className="text-lg font-bold">الأصدقاء</h2>
 
             <p className="mt-0.5 text-xs text-[var(--text-muted)]">
               {friends.length} أصدقاء
             </p>
-
           </div>
 
           <div
@@ -229,7 +218,6 @@ export default function Sidebar({
           >
             {friends.length}
           </div>
-
         </div>
 
         {/* Friends */}
@@ -246,9 +234,7 @@ export default function Sidebar({
             [&::-webkit-scrollbar]:hidden
           "
         >
-
           {friends.length === 0 ? (
-
             <div
               className="
                 liquid-glass
@@ -257,7 +243,6 @@ export default function Sidebar({
                 text-center
               "
             >
-
               <div
                 className="
                   mx-auto
@@ -284,15 +269,10 @@ export default function Sidebar({
               <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 ابحث عن أشخاص وأرسل لهم طلب صداقة
               </p>
-
             </div>
-
           ) : (
-
             <div className="space-y-2">
-
               {friends.map((friend: any) => (
-
                 <button
                   key={friend.uid}
                   type="button"
@@ -310,7 +290,6 @@ export default function Sidebar({
                     active:scale-[0.985]
                   "
                 >
-
                   {/* Avatar */}
 
                   <div
@@ -331,7 +310,6 @@ export default function Sidebar({
                       font-bold
                     "
                   >
-
                     {friend.username
                       ? friend.username.charAt(0).toUpperCase()
                       : "?"}
@@ -349,13 +327,11 @@ export default function Sidebar({
                         bg-emerald-400
                       "
                     />
-
                   </div>
 
                   {/* User */}
 
                   <div className="min-w-0 flex-1">
-
                     <p className="truncate font-semibold">
                       {friend.username}
                     </p>
@@ -363,7 +339,6 @@ export default function Sidebar({
                     <p className="mt-1 text-[11px] text-emerald-500/80">
                       متصل الآن
                     </p>
-
                   </div>
 
                   <span
@@ -378,28 +353,26 @@ export default function Sidebar({
                   >
                     ‹
                   </span>
-
                 </button>
-
               ))}
-
             </div>
-
           )}
-
         </div>
-
       </div>
 
-      {/* Overlay */}
+      {/* =====================================================
+          MENU OVERLAY
+      ===================================================== */}
 
-      <div
+      <button
+        type="button"
+        aria-label="إغلاق القائمة"
         onClick={() => setMenuOpen(false)}
         className={`
           absolute
           inset-0
-          z-40
-          bg-black/30
+          z-[90]
+          bg-black/40
           backdrop-blur-[4px]
           transition-opacity
           duration-300
@@ -412,7 +385,9 @@ export default function Sidebar({
         `}
       />
 
-      {/* Glass menu */}
+      {/* =====================================================
+          GLASS MENU
+      ===================================================== */}
 
       <div
         className={`
@@ -421,10 +396,11 @@ export default function Sidebar({
           bottom-3
           right-3
           top-3
-          z-50
+          z-[100]
           w-[min(330px,calc(100%-24px))]
           overflow-y-auto
           rounded-[32px]
+
           transition-all
           duration-300
           ease-out
@@ -432,25 +408,19 @@ export default function Sidebar({
           ${
             menuOpen
               ? "translate-x-0 opacity-100"
-              : "translate-x-[110%] opacity-0"
+              : "pointer-events-none translate-x-[110%] opacity-0"
           }
         `}
       >
-
         {/* Menu header */}
 
         <div className="flex items-center justify-between p-4">
-
           <div>
-
-            <p className="text-lg font-bold">
-              القائمة
-            </p>
+            <p className="text-lg font-bold">القائمة</p>
 
             <p className="mt-0.5 text-xs text-[var(--text-muted)]">
               AlwadiChat
             </p>
-
           </div>
 
           <button
@@ -471,13 +441,11 @@ export default function Sidebar({
           >
             ×
           </button>
-
         </div>
 
         {/* Menu content */}
 
         <div className="px-3 pb-5">
-
           {/* Profile */}
 
           <button
@@ -495,33 +463,22 @@ export default function Sidebar({
               active:scale-[0.98]
             "
           >
-
-            <span className="text-xl">
-              👤
-            </span>
+            <span className="text-xl">👤</span>
 
             <div className="flex-1">
-
-              <p className="font-semibold">
-                الملف الشخصي
-              </p>
+              <p className="font-semibold">الملف الشخصي</p>
 
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 حسابك ومعلوماتك
               </p>
-
             </div>
 
-            <span className="text-[var(--text-muted)]">
-              ‹
-            </span>
-
+            <span className="text-[var(--text-muted)]">‹</span>
           </button>
 
           {/* Search + Requests */}
 
           <div className="mt-2 grid grid-cols-2 gap-2">
-
             <button
               type="button"
               onClick={() => navigate("/search")}
@@ -533,19 +490,13 @@ export default function Sidebar({
                 active:scale-[0.98]
               "
             >
+              <span className="text-xl">🔍</span>
 
-              <span className="text-xl">
-                🔍
-              </span>
-
-              <p className="mt-2 font-semibold">
-                بحث
-              </p>
+              <p className="mt-2 font-semibold">بحث</p>
 
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 ابحث عن أصدقاء
               </p>
-
             </button>
 
             <button
@@ -559,21 +510,14 @@ export default function Sidebar({
                 active:scale-[0.98]
               "
             >
+              <span className="text-xl">📩</span>
 
-              <span className="text-xl">
-                📩
-              </span>
-
-              <p className="mt-2 font-semibold">
-                الطلبات
-              </p>
+              <p className="mt-2 font-semibold">الطلبات</p>
 
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 طلبات الصداقة
               </p>
-
             </button>
-
           </div>
 
           {/* Appearance */}
@@ -586,25 +530,16 @@ export default function Sidebar({
               p-4
             "
           >
-
             <div className="flex items-center gap-3">
-
-              <span className="text-xl">
-                ⚙️
-              </span>
+              <span className="text-xl">⚙️</span>
 
               <div className="flex-1">
-
-                <p className="font-semibold">
-                  المظهر
-                </p>
+                <p className="font-semibold">المظهر</p>
 
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
                   اختر شكل التطبيق
                 </p>
-
               </div>
-
             </div>
 
             {/* Theme selector */}
@@ -622,7 +557,6 @@ export default function Sidebar({
                 p-1
               "
             >
-
               <button
                 type="button"
                 onClick={() => changeTheme("dark")}
@@ -666,9 +600,7 @@ export default function Sidebar({
               >
                 ☀️ فاتح
               </button>
-
             </div>
-
           </div>
 
           {/* Logout */}
@@ -693,13 +625,9 @@ export default function Sidebar({
               active:scale-[0.98]
             "
           >
-
-            <span className="text-xl">
-              🚪
-            </span>
+            <span className="text-xl">🚪</span>
 
             <div className="flex-1">
-
               <p className="font-semibold text-red-500">
                 تسجيل الخروج
               </p>
@@ -707,15 +635,10 @@ export default function Sidebar({
               <p className="mt-1 text-xs text-red-500/50">
                 الخروج من الحساب
               </p>
-
             </div>
-
           </button>
-
         </div>
-
       </div>
-
     </aside>
   );
 }
