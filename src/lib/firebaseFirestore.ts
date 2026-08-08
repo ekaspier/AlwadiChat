@@ -3,20 +3,18 @@ import {
   addDoc,
   query,
   orderBy,
-  onSnapshot
+  onSnapshot,
+  serverTimestamp
 } from "firebase/firestore";
 
 import { db } from "./firebase";
 
 
-
-
 // إنشاء معرف ثابت للمحادثة بين شخصين
-
 function getChatId(
-  uid1:string,
-  uid2:string
-){
+  uid1: string,
+  uid2: string
+) {
 
   return [uid1, uid2]
     .sort()
@@ -26,20 +24,18 @@ function getChatId(
 
 
 
-
-
-
-// إرسال رسالة
-
+// إرسال رسالة نصية أو صورة
 export async function sendMessage(
 
-  myUid:string,
+  myUid: string,
 
-  friendUid:string,
+  friendUid: string,
 
-  text:string
+  text: string = "",
 
-){
+  imageUrl: string | null = null
+
+) {
 
 
   const chatId = getChatId(
@@ -62,9 +58,11 @@ export async function sendMessage(
 
       text,
 
-      userId:myUid,
+      imageUrl,
 
-      createdAt:new Date().getTime()
+      userId: myUid,
+
+      createdAt: serverTimestamp()
 
     }
 
@@ -75,22 +73,17 @@ export async function sendMessage(
 
 
 
-
-
-
-
-
 // الاستماع للرسائل لحظياً
 
 export function listenToMessages(
 
-  myUid:string,
+  myUid: string,
 
-  friendUid:string,
+  friendUid: string,
 
-  callback:any
+  callback: any
 
-){
+) {
 
 
   const chatId = getChatId(
@@ -118,7 +111,6 @@ export function listenToMessages(
 
 
 
-
   return onSnapshot(
 
     q,
@@ -128,7 +120,7 @@ export function listenToMessages(
 
       const messages = snapshot.docs.map(doc=>({
 
-        id:doc.id,
+        id: doc.id,
 
         ...doc.data()
 
