@@ -34,13 +34,13 @@ export default function ChatWindow({
   sendMessage,
   back,
 }: ChatWindowProps) {
-  const [message, setMessage] =
-    useState("");
-
-  const [uploading, setUploading] =
-    useState(false);
+  const [message, setMessage] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const fileRef =
+    useRef<HTMLInputElement | null>(null);
+
+  const inputRef =
     useRef<HTMLInputElement | null>(null);
 
   const messagesContainerRef =
@@ -48,19 +48,13 @@ export default function ChatWindow({
 
   // =======================================================
   // AUTO SCROLL
-  //
-  // IMPORTANT:
-  // Only the messages container scrolls.
-  // Header + input never move.
   // =======================================================
 
   useEffect(() => {
     const container =
       messagesContainerRef.current;
 
-    if (!container) {
-      return;
-    }
+    if (!container) return;
 
     requestAnimationFrame(() => {
       container.scrollTop =
@@ -69,12 +63,23 @@ export default function ChatWindow({
   }, [messages]);
 
   // =======================================================
+  // KEEP INPUT FOCUSED
+  // =======================================================
+
+  function keepInputFocused() {
+    requestAnimationFrame(() => {
+      inputRef.current?.focus({
+        preventScroll: true,
+      });
+    });
+  }
+
+  // =======================================================
   // SEND TEXT
   // =======================================================
 
   async function handleSend() {
-    const text =
-      message.trim();
+    const text = message.trim();
 
     if (!text || uploading) {
       return;
@@ -83,12 +88,20 @@ export default function ChatWindow({
     try {
       await sendMessage(text);
 
+      // Clear message
       setMessage("");
+
+      // IMPORTANT:
+      // Immediately return focus to input
+      // without scrolling the page.
+      keepInputFocused();
     } catch (error) {
       console.error(
         "Message sending failed:",
         error
       );
+
+      keepInputFocused();
     }
   }
 
@@ -102,9 +115,7 @@ export default function ChatWindow({
     const file =
       e.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     if (
       file.size >
@@ -142,6 +153,9 @@ export default function ChatWindow({
       setUploading(false);
 
       e.target.value = "";
+
+      // Return focus to input
+      keepInputFocused();
     }
   }
 
@@ -158,9 +172,9 @@ export default function ChatWindow({
         w-full
         flex-col
         overflow-hidden
-        bg-[var(--background)]
       "
     >
+
       {/* =================================================
           HEADER
       ================================================= */}
@@ -180,6 +194,7 @@ export default function ChatWindow({
           sm:px-5
         "
       >
+
         {/* Back */}
 
         <button
@@ -244,7 +259,7 @@ export default function ChatWindow({
           />
         </div>
 
-        {/* User information */}
+        {/* User */}
 
         <div
           className="
@@ -260,8 +275,7 @@ export default function ChatWindow({
               sm:text-lg
             "
           >
-            {user?.name ||
-              "مستخدم"}
+            {user?.name || "مستخدم"}
           </h2>
 
           <div
@@ -289,26 +303,24 @@ export default function ChatWindow({
                 sm:text-sm
               "
             >
-              {user?.status ||
-                "متصل"}
+              {user?.status || "متصل"}
             </p>
           </div>
         </div>
+
       </header>
 
-      {/* =================================================
-          MESSAGES CONTAINER
 
-          THIS IS THE ONLY SCROLLABLE ELEMENT.
+      {/* =================================================
+          MESSAGES
       ================================================= */}
 
       <div
-        ref={
-          messagesContainerRef
-        }
+        ref={messagesContainerRef}
         className="
           min-h-0
           flex-1
+          overflow-x-hidden
           overflow-y-auto
           overscroll-contain
           px-3
@@ -318,6 +330,7 @@ export default function ChatWindow({
           [&::-webkit-scrollbar]:hidden
         "
       >
+
         <div
           className="
             mx-auto
@@ -329,9 +342,11 @@ export default function ChatWindow({
             gap-2.5
           "
         >
+
           {/* Empty */}
 
           {messages.length === 0 ? (
+
             <div
               className="
                 flex
@@ -351,6 +366,7 @@ export default function ChatWindow({
                   py-6
                 "
               >
+
                 <div
                   className="
                     mx-auto
@@ -383,18 +399,21 @@ export default function ChatWindow({
                   "
                 >
                   أرسل أول رسالة إلى{" "}
-                  {user?.name ||
-                    "صديقك"}
+                  {user?.name || "صديقك"}
                 </p>
+
               </div>
             </div>
+
           ) : (
+
             <>
               {messages.map(
                 (
                   msg: any,
                   index: number
                 ) => {
+
                   const isMine =
                     msg.sender === "me";
 
@@ -414,6 +433,7 @@ export default function ChatWindow({
                         }
                       `}
                     >
+
                       <div
                         className={`
                           relative
@@ -440,6 +460,7 @@ export default function ChatWindow({
                           }
                         `}
                       >
+
                         {/* IMAGE */}
 
                         {msg.imageUrl && (
@@ -508,13 +529,12 @@ export default function ChatWindow({
                             {msg.time}
                           </p>
                         )}
+
                       </div>
                     </div>
                   );
                 }
               )}
-
-              {/* Bottom space */}
 
               <div
                 className="
@@ -524,21 +544,24 @@ export default function ChatWindow({
                 "
                 aria-hidden="true"
               />
+
             </>
           )}
+
         </div>
       </div>
+
 
       {/* =================================================
           INPUT BAR
 
-          IMPORTANT:
-          This is OUTSIDE the scroll container.
-          Messages can never push it down.
+          ثابت خارج منطقة الرسائل
       ================================================= */}
 
       <div
         className="
+          relative
+          z-20
           shrink-0
           border-t
           border-[var(--glass-border)]
@@ -549,6 +572,7 @@ export default function ChatWindow({
           sm:px-5
         "
       >
+
         <div
           className="
             mx-auto
@@ -559,6 +583,7 @@ export default function ChatWindow({
             gap-2
           "
         >
+
           {/* IMAGE BUTTON */}
 
           <button
@@ -588,6 +613,7 @@ export default function ChatWindow({
             🖼️
           </button>
 
+
           {/* FILE INPUT */}
 
           <input
@@ -602,6 +628,7 @@ export default function ChatWindow({
             hidden
             onChange={handleImage}
           />
+
 
           {/* MESSAGE BAR */}
 
@@ -618,7 +645,9 @@ export default function ChatWindow({
               px-1.5
             "
           >
+
             <input
+              ref={inputRef}
               value={message}
               onChange={(e) =>
                 setMessage(
@@ -626,17 +655,20 @@ export default function ChatWindow({
                 )
               }
               onKeyDown={(e) => {
+
                 if (
-                  e.key ===
-                    "Enter" &&
+                  e.key === "Enter" &&
                   !e.shiftKey
                 ) {
                   e.preventDefault();
 
                   handleSend();
                 }
+
               }}
               disabled={uploading}
+              autoComplete="off"
+              enterKeyHint="send"
               placeholder={
                 uploading
                   ? "جاري رفع الصورة..."
@@ -656,10 +688,16 @@ export default function ChatWindow({
               "
             />
 
+
             {/* SEND */}
 
             <button
               type="button"
+              onMouseDown={(e) => {
+                // Prevent the button from stealing
+                // focus from the keyboard input.
+                e.preventDefault();
+              }}
               onClick={handleSend}
               disabled={
                 uploading ||
@@ -689,9 +727,11 @@ export default function ChatWindow({
                 ? "…"
                 : "➤"}
             </button>
+
           </div>
         </div>
       </div>
+
     </div>
   );
 }
