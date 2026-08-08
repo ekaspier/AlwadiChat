@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -7,7 +6,41 @@ import {
   useState,
 } from "react";
 
+import {
+  ArrowLeft,
+  Image as ImageIcon,
+  MoreHorizontal,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react";
+
 import { uploadImage } from "@/lib/storage";
+
+type ChatWindowProps = {
+  user: {
+    id?: string;
+    name?: string;
+    status?: string;
+  };
+
+  messages: {
+    id?: string;
+    text?: string;
+    imageUrl?: string | null;
+    sender: "me" | "other";
+    time?: string;
+  }[];
+
+  sendMessage: (
+    text: string,
+    imageUrl?: string | null
+  ) => Promise<void>;
+
+  clearChat?: () => Promise<void>;
+
+  back: () => void;
+};
 
 export default function ChatWindow({
   user,
@@ -15,49 +48,59 @@ export default function ChatWindow({
   sendMessage,
   clearChat,
   back,
-}: any) {
+}: ChatWindowProps) {
   const [message, setMessage] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [confirmingClear, setConfirmingClear] = useState(false);
+  const [uploading, setUploading] =
+    useState(false);
 
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] =
+    useState(false);
+
+  const [confirmingClear, setConfirmingClear] =
+    useState(false);
+
+  const fileRef =
+    useRef<HTMLInputElement | null>(null);
+
+  const messagesContainerRef =
+    useRef<HTMLDivElement | null>(null);
 
   // =========================================================
   // AUTO SCROLL
   // =========================================================
 
   useEffect(() => {
-    const container = messagesContainerRef.current;
+    const container =
+      messagesContainerRef.current;
 
-    if (!container) {
-      return;
-    }
+    if (!container) return;
 
     requestAnimationFrame(() => {
       container.scrollTo({
-        top: container.scrollHeight - container.clientHeight,
+        top: container.scrollHeight,
         behavior: "smooth",
       });
     });
   }, [messages]);
 
   // =========================================================
-  // SEND TEXT
+  // SEND MESSAGE
   // =========================================================
 
   async function handleSend() {
     const text = message.trim();
 
-    if (!text || uploading) {
-      return;
-    }
+    if (!text || uploading) return;
 
     try {
       await sendMessage(text);
+
       setMessage("");
     } catch (error) {
-      console.error("Message sending failed:", error);
+      console.error(
+        "Message sending failed:",
+        error
+      );
     }
   }
 
@@ -66,32 +109,47 @@ export default function ChatWindow({
   // =========================================================
 
   async function handleImage(
-    e: React.ChangeEvent<HTMLInputElement>
+    event: React.ChangeEvent<HTMLInputElement>
   ) {
-    const file = e.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert("حجم الصورة يجب أن يكون أقل من 10MB");
-      e.target.value = "";
+    if (
+      file.size >
+      10 * 1024 * 1024
+    ) {
+      alert(
+        "حجم الصورة يجب أن يكون أقل من 10MB"
+      );
+
+      event.target.value = "";
+
       return;
     }
 
     try {
       setUploading(true);
 
-      const imageUrl = await uploadImage(file);
+      const imageUrl =
+        await uploadImage(file);
 
-      await sendMessage("", imageUrl);
+      await sendMessage(
+        "",
+        imageUrl
+      );
     } catch (error) {
-      console.error("Image upload failed:", error);
+      console.error(
+        "Image upload failed:",
+        error
+      );
+
       alert("فشل رفع الصورة");
     } finally {
       setUploading(false);
-      e.target.value = "";
+
+      event.target.value = "";
     }
   }
 
@@ -100,141 +158,56 @@ export default function ChatWindow({
   // =========================================================
 
   async function handleClearChat() {
-    if (!clearChat) {
-      return;
-    }
+    if (!clearChat) return;
 
     try {
       await clearChat();
 
       setConfirmingClear(false);
+      setMenuOpen(false);
     } catch (error) {
-      console.error("Clear chat failed:", error);
-      alert("تعذر مسح المحادثة");
+      console.error(
+        "Clear chat failed:",
+        error
+      );
+
+      alert(
+        "تعذر مسح المحادثة"
+      );
+    }
+  }
+
+  // =========================================================
+  // ENTER
+  // =========================================================
+
+  function handleKeyDown(
+    event: React.KeyboardEvent<HTMLInputElement>
+  ) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
+      event.preventDefault();
+
+      handleSend();
     }
   }
 
   return (
     <section
+      dir="rtl"
       className="
         relative
         flex
-        h-[100dvh]
+        h-full
         min-h-0
         w-full
         flex-col
         overflow-hidden
-        md:h-full
+        bg-[var(--background)]
       "
     >
-      {/* =====================================================
-          MESSAGE ANIMATION
-      ===================================================== */}
-
-      <style>{`
-        @keyframes messageFromRight {
-          0% {
-            opacity: 0;
-            transform: translate3d(22px, 8px, 0) scale(.965);
-            filter: blur(5px);
-          }
-
-          55% {
-            opacity: .92;
-            transform: translate3d(-2px, 0, 0) scale(1.005);
-            filter: blur(.8px);
-          }
-
-          100% {
-            opacity: 1;
-            transform: translate3d(0, 0, 0) scale(1);
-            filter: blur(0);
-          }
-        }
-
-        @keyframes messageFromLeft {
-          0% {
-            opacity: 0;
-            transform: translate3d(-22px, 8px, 0) scale(.965);
-            filter: blur(5px);
-          }
-
-          55% {
-            opacity: .92;
-            transform: translate3d(2px, 0, 0) scale(1.005);
-            filter: blur(.8px);
-          }
-
-          100% {
-            opacity: 1;
-            transform: translate3d(0, 0, 0) scale(1);
-            filter: blur(0);
-          }
-        }
-
-        .message-enter-right {
-          animation:
-            messageFromRight
-            420ms
-            cubic-bezier(.22, 1, .36, 1)
-            both;
-
-          transform-origin: right bottom;
-          will-change: transform, opacity, filter;
-        }
-
-        .message-enter-left {
-          animation:
-            messageFromLeft
-            420ms
-            cubic-bezier(.22, 1, .36, 1)
-            both;
-
-          transform-origin: left bottom;
-          will-change: transform, opacity, filter;
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          .message-enter-right,
-          .message-enter-left {
-            animation: none;
-          }
-        }
-      `}</style>
-
-      {/* =====================================================
-          BACKGROUND
-      ===================================================== */}
-
-      <div
-        className="
-          pointer-events-none
-          absolute
-          -top-32
-          right-1/4
-          z-0
-          h-72
-          w-72
-          rounded-full
-          bg-blue-500/[0.035]
-          blur-3xl
-        "
-      />
-
-      <div
-        className="
-          pointer-events-none
-          absolute
-          bottom-1/4
-          -left-32
-          z-0
-          h-80
-          w-80
-          rounded-full
-          bg-purple-500/[0.025]
-          blur-3xl
-        "
-      />
 
       {/* =====================================================
           HEADER
@@ -245,21 +218,23 @@ export default function ChatWindow({
           relative
           z-30
           flex
-          h-[76px]
+          h-[68px]
           shrink-0
           items-center
-          gap-3
+          gap-2.5
           border-b
           border-[var(--glass-border)]
           bg-[var(--glass-bg)]
           px-3
-          shadow-[0_8px_35px_rgba(0,0,0,0.08)]
+          shadow-[0_4px_24px_rgba(0,0,0,0.06)]
           backdrop-blur-3xl
           backdrop-saturate-150
+          sm:h-[72px]
           sm:px-5
         "
       >
-        {/* Back */}
+
+        {/* BACK */}
 
         <button
           type="button"
@@ -268,32 +243,32 @@ export default function ChatWindow({
           className="
             glass-button
             flex
-            h-11
-            w-11
+            h-10
+            w-10
             shrink-0
             items-center
             justify-center
             rounded-full
-            text-2xl
             text-[var(--text-secondary)]
-            transition-all
-            duration-200
+            transition
             active:scale-90
             md:hidden
           "
         >
-          ‹
+          <ArrowLeft
+            className="h-5 w-5"
+          />
         </button>
 
-        {/* Avatar */}
+        {/* AVATAR */}
 
         <div
           className="
             relative
             flex
-            h-12
-            w-12
-            min-w-12
+            h-11
+            w-11
+            shrink-0
             items-center
             justify-center
             overflow-hidden
@@ -301,41 +276,47 @@ export default function ChatWindow({
             border
             border-[var(--glass-border)]
             bg-[var(--glass-bg-strong)]
-            text-lg
+            text-base
             font-bold
-            shadow-[inset_0_1px_0_var(--glass-highlight)]
           "
         >
-          {user?.name?.[0]?.toUpperCase() || "U"}
+          {user?.name?.[0]
+            ?.toUpperCase() ||
+            "U"}
 
           <span
             className="
               absolute
               bottom-0
               right-0
-              h-3.5
-              w-3.5
+              h-3
+              w-3
               rounded-full
               border-2
               border-[var(--background)]
               bg-emerald-400
-              shadow-[0_0_10px_rgba(52,211,153,0.6)]
             "
           />
         </div>
 
-        {/* User info */}
+        {/* USER */}
 
-        <div className="min-w-0 flex-1">
+        <div
+          className="
+            min-w-0
+            flex-1
+          "
+        >
           <h2
             className="
               truncate
-              text-base
+              text-[15px]
               font-bold
-              sm:text-lg
+              sm:text-base
             "
           >
-            {user?.name || "مستخدم"}
+            {user?.name ||
+              "مستخدم"}
           </h2>
 
           <div
@@ -355,133 +336,301 @@ export default function ChatWindow({
               "
             />
 
-            <p
+            <span
               className="
                 truncate
-                text-xs
+                text-[11px]
                 text-[var(--text-secondary)]
-                sm:text-sm
+                sm:text-xs
               "
             >
-              {user?.status || "متصل"}
-            </p>
+              {user?.status ||
+                "متصل الآن"}
+            </span>
           </div>
         </div>
 
-        {/* Clear chat */}
+        {/* MORE */}
 
         <button
           type="button"
-          onDoubleClick={() => setConfirmingClear(true)}
+          onClick={() =>
+            setMenuOpen(
+              (value) => !value
+            )
+          }
           aria-label="خيارات المحادثة"
-          title="انقر مرتين لمسح المحادثة"
+          aria-expanded={menuOpen}
           className="
             glass-button
             flex
-            h-11
-            w-11
+            h-10
+            w-10
             shrink-0
-            select-none
             items-center
             justify-center
             rounded-full
-            text-xl
-            font-bold
             text-[var(--text-secondary)]
-            transition-all
-            duration-200
+            transition
             active:scale-90
           "
         >
-          ⋯
+          <MoreHorizontal
+            className="h-5 w-5"
+          />
         </button>
       </header>
+
+      {/* =====================================================
+          MENU
+      ===================================================== */}
+
+      {menuOpen && (
+        <>
+          <div
+            className="
+              fixed
+              inset-0
+              z-[90]
+            "
+            onClick={() =>
+              setMenuOpen(false)
+            }
+          />
+
+          <div
+            className="
+              absolute
+              left-3
+              top-[76px]
+              z-[100]
+              w-[210px]
+              overflow-hidden
+              rounded-[20px]
+              border
+              border-[var(--glass-border)]
+              bg-[var(--glass-bg-ultra)]
+              p-1.5
+              shadow-[0_20px_60px_rgba(0,0,0,0.25)]
+              backdrop-blur-3xl
+            "
+          >
+
+            {clearChat && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setConfirmingClear(true);
+                }}
+                className="
+                  flex
+                  w-full
+                  items-center
+                  gap-3
+                  rounded-[15px]
+                  px-3
+                  py-3
+                  text-right
+                  text-sm
+                  text-red-400
+                  transition
+                  hover:bg-red-500/10
+                  active:scale-[0.98]
+                "
+              >
+                <Trash2
+                  className="h-5 w-5"
+                />
+
+                <span>
+                  مسح المحادثة
+                </span>
+              </button>
+            )}
+
+          </div>
+        </>
+      )}
 
       {/* =====================================================
           CLEAR CONFIRMATION
       ===================================================== */}
 
       {confirmingClear && (
-        <div
-          className="
-            absolute
-            right-4
-            top-[88px]
-            z-50
-            w-[min(300px,calc(100vw-32px))]
-            rounded-[22px]
-            border
-            border-[var(--glass-border)]
-            bg-[var(--glass-bg-ultra)]
-            p-4
-            shadow-[0_20px_60px_rgba(0,0,0,0.30)]
-            backdrop-blur-3xl
-          "
-        >
-          <p
+        <>
+          <div
             className="
-              font-semibold
-              text-[var(--text-primary)]
+              absolute
+              inset-0
+              z-[150]
+              bg-black/20
+              backdrop-blur-[2px]
+            "
+            onClick={() =>
+              setConfirmingClear(false)
+            }
+          />
+
+          <div
+            className="
+              absolute
+              left-1/2
+              top-1/2
+              z-[200]
+              w-[calc(100%-32px)]
+              max-w-[340px]
+              -translate-x-1/2
+              -translate-y-1/2
+              rounded-[24px]
+              border
+              border-[var(--glass-border)]
+              bg-[var(--glass-bg-ultra)]
+              p-5
+              shadow-[0_30px_100px_rgba(0,0,0,0.35)]
+              backdrop-blur-3xl
             "
           >
-            مسح محتوى المحادثة؟
-          </p>
 
-          <p
-            className="
-              mt-1.5
-              text-xs
-              leading-5
-              text-[var(--text-secondary)]
-            "
-          >
-            ستختفي الرسائل القديمة من محادثتك.
-            لن يتم حذفها من الطرف الآخر.
-          </p>
-
-          <div className="mt-4 flex gap-2">
-            <button
-              type="button"
-              onClick={handleClearChat}
+            <div
               className="
-                flex-1
-                rounded-[14px]
-                bg-red-500
-                px-3
-                py-2.5
-                text-sm
-                font-semibold
-                text-white
-                transition
-                hover:bg-red-400
-                active:scale-95
+                flex
+                items-start
+                gap-3
               "
             >
-              مسح
-            </button>
 
-            <button
-              type="button"
-              onClick={() => setConfirmingClear(false)}
+              <div
+                className="
+                  flex
+                  h-10
+                  w-10
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-full
+                  bg-red-500/10
+                  text-red-400
+                "
+              >
+                <Trash2
+                  className="h-5 w-5"
+                />
+              </div>
+
+              <div
+                className="
+                  min-w-0
+                  flex-1
+                "
+              >
+                <h3
+                  className="
+                    font-bold
+                    text-[var(--text-primary)]
+                  "
+                >
+                  مسح المحادثة؟
+                </h3>
+
+                <p
+                  className="
+                    mt-1.5
+                    text-xs
+                    leading-5
+                    text-[var(--text-secondary)]
+                  "
+                >
+                  ستختفي الرسائل القديمة
+                  من محادثتك فقط، ولن يتم
+                  حذفها من الطرف الآخر.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setConfirmingClear(false)
+                }
+                aria-label="إغلاق"
+                className="
+                  flex
+                  h-8
+                  w-8
+                  shrink-0
+                  items-center
+                  justify-center
+                  rounded-full
+                  text-[var(--text-muted)]
+                  transition
+                  hover:bg-[var(--glass-bg-strong)]
+                "
+              >
+                <X
+                  className="h-5 w-5"
+                />
+              </button>
+
+            </div>
+
+            <div
               className="
-                flex-1
-                rounded-[14px]
-                border
-                border-[var(--glass-border)]
-                bg-[var(--glass-bg-strong)]
-                px-3
-                py-2.5
-                text-sm
-                font-semibold
-                transition
-                hover:bg-[var(--glass-bg-ultra)]
-                active:scale-95
+                mt-5
+                flex
+                gap-2
               "
             >
-              إلغاء
-            </button>
+
+              <button
+                type="button"
+                onClick={
+                  handleClearChat
+                }
+                className="
+                  flex-1
+                  rounded-[14px]
+                  bg-red-500
+                  px-3
+                  py-2.5
+                  text-sm
+                  font-semibold
+                  text-white
+                  transition
+                  hover:bg-red-400
+                  active:scale-95
+                "
+              >
+                مسح
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setConfirmingClear(false)
+                }
+                className="
+                  flex-1
+                  rounded-[14px]
+                  border
+                  border-[var(--glass-border)]
+                  bg-[var(--glass-bg-strong)]
+                  px-3
+                  py-2.5
+                  text-sm
+                  font-semibold
+                  text-[var(--text-primary)]
+                  transition
+                  hover:bg-[var(--glass-bg-ultra)]
+                  active:scale-95
+                "
+              >
+                إلغاء
+              </button>
+
+            </div>
+
           </div>
-        </div>
+        </>
       )}
 
       {/* =====================================================
@@ -489,7 +638,9 @@ export default function ChatWindow({
       ===================================================== */}
 
       <div
-        ref={messagesContainerRef}
+        ref={
+          messagesContainerRef
+        }
         className="
           relative
           z-10
@@ -498,15 +649,18 @@ export default function ChatWindow({
           overflow-y-auto
           overscroll-contain
           px-3
-          pb-[90px]
-          pt-5
+          pb-[92px]
+          pt-4
           sm:px-5
-          sm:pb-28
+          sm:pb-[100px]
+          sm:pt-5
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
         "
       >
+
         {messages.length === 0 ? (
+
           <div
             className="
               flex
@@ -516,16 +670,15 @@ export default function ChatWindow({
               px-5
             "
           >
+
             <div
               className="
-                liquid-glass
                 w-full
                 max-w-xs
-                px-6
-                py-6
                 text-center
               "
             >
+
               <div
                 className="
                   mx-auto
@@ -535,116 +688,118 @@ export default function ChatWindow({
                   w-16
                   items-center
                   justify-center
-                  rounded-[22px]
+                  rounded-full
                   border
                   border-[var(--glass-border)]
                   bg-[var(--glass-bg-strong)]
-                  text-3xl
-                  shadow-[inset_0_1px_0_var(--glass-highlight)]
+                  text-2xl
+                  font-bold
+                  shadow-[0_15px_45px_rgba(0,0,0,0.10)]
                 "
               >
-                💬
+                {user?.name?.[0]
+                  ?.toUpperCase() ||
+                  "U"}
               </div>
 
-              <p className="font-bold">
-                ابدأ المحادثة
+              <p
+                className="
+                  font-bold
+                  text-[var(--text-primary)]
+                "
+              >
+                {user?.name ||
+                  "مستخدم"}
               </p>
 
               <p
                 className="
-                  mt-2
-                  text-sm
-                  leading-6
+                  mt-1.5
+                  text-xs
+                  leading-5
                   text-[var(--text-secondary)]
                 "
               >
-                أرسل أول رسالة إلى{" "}
-                {user?.name || "صديقك"}
+                ابدأ المحادثة بإرسال
+                أول رسالة
               </p>
+
             </div>
+
           </div>
+
         ) : (
+
           <div
             className="
               mx-auto
               flex
               max-w-4xl
               flex-col
-              gap-2.5
+              gap-1.5
             "
           >
+
             {messages.map(
-              (msg: any, index: number) => {
+              (msg, index) => {
+
                 const isMine =
-                  msg.sender === "me";
+                  msg.sender ===
+                  "me";
 
                 return (
                   <div
-                    key={msg.id || index}
+                    key={
+                      msg.id ||
+                      index
+                    }
                     className={`
                       flex
                       w-full
-
                       ${
                         isMine
-                          ? "justify-end"
-                          : "justify-start"
-                      }
-
-                      ${
-                        isMine
-                          ? "message-enter-right"
-                          : "message-enter-left"
+                          ? "justify-start"
+                          : "justify-end"
                       }
                     `}
                   >
+
                     <div
                       className={`
-                        relative
-                        max-w-[85%]
+                        max-w-[78%]
                         overflow-hidden
-                        rounded-[24px]
-                        px-4
-                        py-3
-                        shadow-[0_8px_30px_rgba(0,0,0,0.08)]
+                        rounded-[22px]
+                        px-3.5
+                        py-2.5
+                        shadow-[0_3px_12px_rgba(0,0,0,0.06)]
                         sm:max-w-[65%]
 
                         ${
                           isMine
                             ? `
-                              rounded-br-[8px]
+                              rounded-br-[7px]
                               bg-[var(--accent)]
                               text-[var(--accent-foreground)]
-                              shadow-[0_8px_25px_rgba(0,0,0,0.12)]
                             `
                             : `
-                              liquid-glass
-                              rounded-bl-[8px]
+                              rounded-bl-[7px]
+                              border
+                              border-[var(--glass-border)]
+                              bg-[var(--glass-bg-strong)]
+                              text-[var(--text-primary)]
                             `
                         }
                       `}
                     >
-                      {!isMine && (
-                        <div
-                          className="
-                            pointer-events-none
-                            absolute
-                            inset-x-0
-                            top-0
-                            h-px
-                            bg-[var(--glass-highlight)]
-                          "
-                        />
-                      )}
 
-                      {/* Image */}
+                      {/* IMAGE */}
 
                       {msg.imageUrl && (
                         <button
                           type="button"
                           onClick={() =>
                             window.open(
-                              msg.imageUrl,
+                              msg.imageUrl!,
                               "_blank",
                               "noopener,noreferrer"
                             )
@@ -652,36 +807,34 @@ export default function ChatWindow({
                           className="
                             block
                             w-full
-                            text-left
+                            overflow-hidden
+                            rounded-[16px]
                           "
                         >
                           <img
-                            src={msg.imageUrl}
+                            src={
+                              msg.imageUrl
+                            }
                             alt="صورة مرسلة"
                             className="
                               block
                               max-h-[360px]
                               max-w-full
-                              rounded-[18px]
                               object-cover
-                              transition-transform
-                              duration-300
-                              hover:scale-[1.015]
                             "
                           />
                         </button>
                       )}
 
-                      {/* Text */}
+                      {/* TEXT */}
 
                       {msg.text && (
                         <p
                           className={`
-                            break-words
                             whitespace-pre-wrap
+                            break-words
                             text-[15px]
-                            leading-6
-
+                            leading-[1.45]
                             ${
                               msg.imageUrl
                                 ? "mt-2"
@@ -693,26 +846,26 @@ export default function ChatWindow({
                         </p>
                       )}
 
-                      {/* Time */}
+                      {/* TIME */}
 
                       {msg.time && (
-                        <p
+                        <div
                           className={`
-                            mt-1.5
-                            text-right
-                            text-[10px]
-
+                            mt-1
+                            text-[9px]
                             ${
                               isMine
-                                ? "opacity-50"
+                                ? "opacity-60"
                                 : "text-[var(--text-muted)]"
                             }
                           `}
                         >
                           {msg.time}
-                        </p>
+                        </div>
                       )}
+
                     </div>
+
                   </div>
                 );
               }
@@ -720,47 +873,48 @@ export default function ChatWindow({
 
             <div
               className="
-                h-4
-                w-full
+                h-2
                 shrink-0
               "
               aria-hidden="true"
             />
+
           </div>
+
         )}
+
       </div>
 
       {/* =====================================================
-          INPUT BAR
+          INSTAGRAM DM INPUT
       ===================================================== */}
 
       <div
         className="
-          pointer-events-none
           absolute
           bottom-0
           left-0
           right-0
           z-40
           px-3
-          pt-3
-          pb-[calc(10px+env(safe-area-inset-bottom))]
+          pb-[max(8px,env(safe-area-inset-bottom))]
+          pt-2
           sm:px-5
-          sm:pb-5
+          sm:pb-4
         "
       >
+
         <div
           className="
-            pointer-events-auto
             mx-auto
             flex
-            w-full
             max-w-4xl
-            items-end
+            items-center
             gap-2
           "
         >
-          {/* Image button */}
+
+          {/* IMAGE BUTTON */}
 
           <button
             type="button"
@@ -770,151 +924,144 @@ export default function ChatWindow({
             disabled={uploading}
             aria-label="إرسال صورة"
             className="
-              glass-button
               flex
-              h-[48px]
-              w-[48px]
-              min-w-[48px]
+              h-[46px]
+              w-[46px]
               shrink-0
               items-center
               justify-center
               rounded-full
+              border
               border-[var(--glass-border)]
               bg-[var(--glass-bg-strong)]
-              text-xl
-              shadow-[0_8px_30px_rgba(0,0,0,0.18)]
+              text-[var(--text-secondary)]
+              shadow-[0_5px_25px_rgba(0,0,0,0.12)]
               backdrop-blur-3xl
-              transition-all
-              duration-200
+              transition
+              hover:bg-[var(--glass-bg-ultra)]
               active:scale-90
-              disabled:cursor-not-allowed
               disabled:opacity-40
             "
           >
-            🖼️
+            <ImageIcon
+              className="h-[21px] w-[21px]"
+            />
           </button>
 
-          {/* Hidden file input */}
+          {/* FILE */}
 
           <input
             ref={fileRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="
+              image/jpeg,
+              image/png,
+              image/webp,
+              image/gif
+            "
             hidden
-            onChange={handleImage}
+            onChange={
+              handleImage
+            }
           />
 
-          {/* Message input */}
+          {/* MESSAGE INPUT */}
 
           <div
             className="
               flex
-              min-h-[48px]
+              h-[46px]
               min-w-0
               flex-1
               items-center
-              rounded-[26px]
+              rounded-full
               border
-              border-transparent
-              bg-transparent
-              px-0
+              border-[var(--glass-border)]
+              bg-[var(--glass-bg-strong)]
+              px-1.5
+              shadow-[0_5px_25px_rgba(0,0,0,0.12)]
+              backdrop-blur-3xl
+              backdrop-saturate-150
+              transition
+              focus-within:border-[var(--glass-highlight)]
+              focus-within:bg-[var(--glass-bg-ultra)]
             "
           >
-            <div
+
+            <input
+              value={message}
+              onChange={(event) =>
+                setMessage(
+                  event.target.value
+                )
+              }
+              onKeyDown={
+                handleKeyDown
+              }
+              disabled={uploading}
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              placeholder={
+                uploading
+                  ? "جاري رفع الصورة..."
+                  : "رسالة..."
+              }
               className="
-                flex
-                min-h-[48px]
                 min-w-0
                 flex-1
+                bg-transparent
+                px-3
+                text-[15px]
+                text-[var(--text-primary)]
+                outline-none
+                placeholder:text-[var(--text-muted)]
+                disabled:opacity-50
+              "
+            />
+
+            {/* SEND */}
+
+            <button
+              type="button"
+              onClick={
+                handleSend
+              }
+              disabled={
+                uploading ||
+                !message.trim()
+              }
+              aria-label="إرسال"
+              className="
+                flex
+                h-9
+                w-9
+                shrink-0
                 items-center
-                rounded-[26px]
-                border
-                border-[var(--glass-border)]
-                bg-[var(--glass-bg-strong)]
-                px-1.5
-                shadow-[0_10px_35px_rgba(0,0,0,0.20),inset_0_1px_0_var(--glass-highlight)]
-                backdrop-blur-3xl
-                backdrop-saturate-180
-                transition-all
-                duration-300
-                focus-within:border-[var(--glass-highlight)]
-                focus-within:bg-[var(--glass-bg-ultra)]
-                focus-within:shadow-[0_12px_40px_rgba(0,0,0,0.24),inset_0_1px_0_var(--glass-highlight)]
+                justify-center
+                rounded-full
+                bg-[var(--accent)]
+                text-[var(--accent-foreground)]
+                shadow-[0_4px_15px_rgba(0,0,0,0.14)]
+                transition
+                hover:scale-105
+                active:scale-90
+                disabled:cursor-default
+                disabled:opacity-0
+                disabled:hover:scale-100
               "
             >
-              <input
-                value={message}
-                onChange={(e) =>
-                  setMessage(e.target.value)
-                }
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    !e.shiftKey
-                  ) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                disabled={uploading}
-                className="
-                  min-w-0
-                  flex-1
-                  bg-transparent
-                  px-3
-                  py-2.5
-                  text-[15px]
-                  text-[var(--text-primary)]
-                  outline-none
-                  placeholder:text-[var(--text-muted)]
-                  disabled:opacity-50
-                "
-                placeholder={
-                  uploading
-                    ? "جاري رفع الصورة..."
-                    : "اكتب رسالة..."
-                }
+              <Send
+                className="h-[17px] w-[17px]"
               />
+            </button>
 
-              {/* Send button */}
-
-              <button
-                type="button"
-                onClick={handleSend}
-                disabled={
-                  uploading ||
-                  !message.trim()
-                }
-                aria-label="إرسال الرسالة"
-                className="
-                  flex
-                  h-10
-                  w-10
-                  min-w-10
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-full
-                  bg-[var(--accent)]
-                  text-[var(--accent-foreground)]
-                  text-base
-                  font-bold
-                  shadow-[0_5px_20px_rgba(0,0,0,0.18)]
-                  transition-all
-                  duration-200
-                  hover:scale-[1.04]
-                  active:scale-90
-                  disabled:cursor-not-allowed
-                  disabled:opacity-30
-                  disabled:hover:scale-100
-                "
-              >
-                {uploading ? "…" : "➤"}
-              </button>
-            </div>
           </div>
+
         </div>
+
       </div>
+
     </section>
   );
 }
