@@ -13,7 +13,10 @@ import { uploadImage } from "@/lib/storage";
 // =========================================================
 
 type ChatWindowProps = {
+  currentUserUid: string;
+
   user: any;
+
   messages: any[];
 
   sendMessage: (
@@ -22,6 +25,14 @@ type ChatWindowProps = {
   ) => Promise<void>;
 
   back: () => void;
+
+  onClearChat: () => Promise<void>;
+
+  onArchiveChat: () => void;
+
+  onUnarchiveChat: () => void;
+
+  isArchived: boolean;
 };
 
 // =========================================================
@@ -29,16 +40,34 @@ type ChatWindowProps = {
 // =========================================================
 
 export default function ChatWindow({
+  currentUserUid,
   user,
   messages,
   sendMessage,
   back,
+  onClearChat,
+  onArchiveChat,
+  onUnarchiveChat,
+  isArchived,
 }: ChatWindowProps) {
   const [message, setMessage] =
     useState("");
 
   const [uploading, setUploading] =
     useState(false);
+
+  const [menuOpen, setMenuOpen] =
+    useState(false);
+
+  const [
+    showDeleteConfirm,
+    setShowDeleteConfirm,
+  ] = useState(false);
+
+  const [
+    deletingChat,
+    setDeletingChat,
+  ] = useState(false);
 
   const fileRef =
     useRef<HTMLInputElement | null>(null);
@@ -48,10 +77,6 @@ export default function ChatWindow({
 
   // =======================================================
   // AUTO SCROLL
-  //
-  // IMPORTANT:
-  // Only the messages container scrolls.
-  // Header + input never move.
   // =======================================================
 
   useEffect(() => {
@@ -76,7 +101,10 @@ export default function ChatWindow({
     const text =
       message.trim();
 
-    if (!text || uploading) {
+    if (
+      !text ||
+      uploading
+    ) {
       return;
     }
 
@@ -88,6 +116,10 @@ export default function ChatWindow({
       console.error(
         "Message sending failed:",
         error
+      );
+
+      alert(
+        "فشل إرسال الرسالة"
       );
     }
   }
@@ -146,12 +178,85 @@ export default function ChatWindow({
   }
 
   // =======================================================
+  // DELETE CHAT
+  // =======================================================
+
+  async function confirmDeleteChat() {
+    if (
+      !currentUserUid ||
+      !user?.id ||
+      deletingChat
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingChat(true);
+
+      await onClearChat();
+
+      setShowDeleteConfirm(false);
+      setMenuOpen(false);
+    } catch (error) {
+      console.error(
+        "Delete chat failed:",
+        error
+      );
+
+      alert(
+        "فشل حذف المحادثة"
+      );
+    } finally {
+      setDeletingChat(false);
+    }
+  }
+
+  // =======================================================
+  // ARCHIVE
+  // =======================================================
+
+  function handleArchive() {
+    try {
+      onArchiveChat();
+
+      setMenuOpen(false);
+    } catch (error) {
+      console.error(
+        "Archive chat failed:",
+        error
+      );
+
+      alert(
+        "فشل أرشفة المحادثة"
+      );
+    }
+  }
+
+  // =======================================================
+  // UNARCHIVE
+  // =======================================================
+
+  function handleUnarchive() {
+    try {
+      onUnarchiveChat();
+
+      setMenuOpen(false);
+    } catch (error) {
+      console.error(
+        "Unarchive chat failed:",
+        error
+      );
+    }
+  }
+
+  // =======================================================
   // UI
   // =======================================================
 
   return (
     <div
       className="
+        relative
         flex
         h-full
         min-h-0
@@ -167,6 +272,8 @@ export default function ChatWindow({
 
       <header
         className="
+          relative
+          z-30
           flex
           h-[76px]
           min-h-[76px]
@@ -180,7 +287,7 @@ export default function ChatWindow({
           sm:px-5
         "
       >
-        {/* Back */}
+        {/* BACK */}
 
         <button
           type="button"
@@ -205,7 +312,7 @@ export default function ChatWindow({
           ‹
         </button>
 
-        {/* Avatar */}
+        {/* AVATAR */}
 
         <div
           className="
@@ -244,7 +351,7 @@ export default function ChatWindow({
           />
         </div>
 
-        {/* User information */}
+        {/* USER INFO */}
 
         <div
           className="
@@ -294,18 +401,366 @@ export default function ChatWindow({
             </p>
           </div>
         </div>
+
+        {/* CALL */}
+
+        <button
+          type="button"
+          aria-label="اتصال"
+          className="
+            glass-button
+            hidden
+            h-11
+            w-11
+            shrink-0
+            items-center
+            justify-center
+            rounded-full
+            text-lg
+            transition
+            active:scale-90
+            sm:flex
+          "
+          title="اتصال"
+        >
+          📞
+        </button>
+
+        {/* VIDEO */}
+
+        <button
+          type="button"
+          aria-label="مكالمة فيديو"
+          className="
+            glass-button
+            hidden
+            h-11
+            w-11
+            shrink-0
+            items-center
+            justify-center
+            rounded-full
+            text-lg
+            transition
+            active:scale-90
+            sm:flex
+          "
+          title="مكالمة فيديو"
+        >
+          📹
+        </button>
+
+        {/* MENU */}
+
+        <button
+          type="button"
+          onClick={() =>
+            setMenuOpen(
+              (current) =>
+                !current
+            )
+          }
+          aria-label="خيارات المحادثة"
+          aria-expanded={menuOpen}
+          className="
+            glass-button
+            flex
+            h-11
+            w-11
+            shrink-0
+            items-center
+            justify-center
+            rounded-full
+            text-2xl
+            leading-none
+            text-[var(--text-secondary)]
+            transition
+            active:scale-90
+          "
+        >
+          ⋮
+        </button>
       </header>
 
       {/* =================================================
-          MESSAGES CONTAINER
+          CHAT MENU
+      ================================================= */}
 
-          THIS IS THE ONLY SCROLLABLE ELEMENT.
+      {menuOpen && (
+        <>
+          <div
+            className="
+              fixed
+              inset-0
+              z-[9990]
+              bg-black/25
+              backdrop-blur-[2px]
+            "
+            onClick={() =>
+              setMenuOpen(false)
+            }
+          />
+
+          <div
+            className="
+              liquid-glass-menu
+              fixed
+              right-4
+              top-[82px]
+              z-[9999]
+              w-[240px]
+              p-2
+            "
+            dir="rtl"
+          >
+            {/* ARCHIVE / UNARCHIVE */}
+
+            <button
+              type="button"
+              onClick={
+                isArchived
+                  ? handleUnarchive
+                  : handleArchive
+              }
+              className="
+                flex
+                w-full
+                items-center
+                gap-3
+                rounded-[18px]
+                px-4
+                py-3.5
+                text-right
+                text-sm
+                font-semibold
+                transition
+                hover:bg-white/[0.08]
+                active:scale-[0.98]
+              "
+            >
+              <span className="text-xl">
+                {isArchived
+                  ? "📂"
+                  : "📦"}
+              </span>
+
+              <span>
+                {isArchived
+                  ? "إلغاء الأرشفة"
+                  : "أرشفة المحادثة"}
+              </span>
+            </button>
+
+            {/* DELETE */}
+
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+
+                setShowDeleteConfirm(
+                  true
+                );
+              }}
+              disabled={deletingChat}
+              className="
+                mt-1
+                flex
+                w-full
+                items-center
+                gap-3
+                rounded-[18px]
+                px-4
+                py-3.5
+                text-right
+                text-sm
+                font-semibold
+                text-red-400
+                transition
+                hover:bg-red-500/[0.10]
+                active:scale-[0.98]
+                disabled:cursor-not-allowed
+                disabled:opacity-50
+              "
+            >
+              <span className="text-xl">
+                🗑️
+              </span>
+
+              <span>
+                حذف المحادثة
+              </span>
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* =================================================
+          DELETE CONFIRMATION
+      ================================================= */}
+
+      {showDeleteConfirm && (
+        <>
+          <div
+            className="
+              fixed
+              inset-0
+              z-[10000]
+              bg-black/60
+              backdrop-blur-sm
+            "
+            onClick={() => {
+              if (!deletingChat) {
+                setShowDeleteConfirm(
+                  false
+                );
+              }
+            }}
+          />
+
+          <div
+            className="
+              fixed
+              left-1/2
+              top-1/2
+              z-[10001]
+              w-[min(380px,calc(100vw-32px))]
+              -translate-x-1/2
+              -translate-y-1/2
+              rounded-[28px]
+              border
+              border-white/10
+              bg-[#151515]/95
+              p-6
+              text-white
+              shadow-[0_30px_100px_rgba(0,0,0,0.7)]
+              backdrop-blur-3xl
+            "
+            dir="rtl"
+          >
+            <div
+              className="
+                mx-auto
+                flex
+                h-16
+                w-16
+                items-center
+                justify-center
+                rounded-[20px]
+                bg-red-500/10
+                text-3xl
+              "
+            >
+              🗑️
+            </div>
+
+            <h3
+              className="
+                mt-5
+                text-center
+                text-lg
+                font-bold
+              "
+            >
+              حذف المحادثة؟
+            </h3>
+
+            <p
+              className="
+                mt-2
+                text-center
+                text-sm
+                leading-6
+                text-white/50
+              "
+            >
+              سيتم حذف جميع الرسائل
+              مع{" "}
+              {user?.name ||
+                "هذا المستخدم"}.
+              <br />
+
+              <span
+                className="
+                  font-semibold
+                  text-red-400/80
+                "
+              >
+                لا يمكن التراجع عن
+                هذا الإجراء.
+              </span>
+            </p>
+
+            <div
+              className="
+                mt-6
+                grid
+                grid-cols-2
+                gap-3
+              "
+            >
+              <button
+                type="button"
+                disabled={deletingChat}
+                onClick={() =>
+                  setShowDeleteConfirm(
+                    false
+                  )
+                }
+                className="
+                  rounded-[16px]
+                  border
+                  border-white/10
+                  bg-white/[0.06]
+                  px-4
+                  py-3
+                  font-semibold
+                  text-white/80
+                  transition
+                  hover:bg-white/[0.10]
+                  active:scale-[0.98]
+                  disabled:cursor-not-allowed
+                  disabled:opacity-40
+                "
+              >
+                إلغاء
+              </button>
+
+              <button
+                type="button"
+                disabled={deletingChat}
+                onClick={
+                  confirmDeleteChat
+                }
+                className="
+                  rounded-[16px]
+                  bg-red-500
+                  px-4
+                  py-3
+                  font-semibold
+                  text-white
+                  transition
+                  hover:bg-red-600
+                  active:scale-[0.98]
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                {deletingChat
+                  ? "جاري الحذف..."
+                  : "حذف المحادثة"}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* =================================================
+          MESSAGES
       ================================================= */}
 
       <div
-        ref={
-          messagesContainerRef
-        }
+        ref={messagesContainerRef}
         className="
           min-h-0
           flex-1
@@ -329,8 +784,6 @@ export default function ChatWindow({
             gap-2.5
           "
         >
-          {/* Empty */}
-
           {messages.length === 0 ? (
             <div
               className="
@@ -382,7 +835,8 @@ export default function ChatWindow({
                     text-[var(--text-secondary)]
                   "
                 >
-                  أرسل أول رسالة إلى{" "}
+                  أرسل أول رسالة
+                  إلى{" "}
                   {user?.name ||
                     "صديقك"}
                 </p>
@@ -434,14 +888,14 @@ export default function ChatWindow({
                               `
                               : `
                                 rounded-bl-[8px]
+                                border
+                                border-[var(--glass-border-soft)]
                                 bg-[var(--glass-bg-strong)]
                                 text-[var(--text-primary)]
                               `
                           }
                         `}
                       >
-                        {/* IMAGE */}
-
                         {msg.imageUrl && (
                           <button
                             type="button"
@@ -452,10 +906,7 @@ export default function ChatWindow({
                                 "noopener,noreferrer"
                               )
                             }
-                            className="
-                              block
-                              w-full
-                            "
+                            className="block w-full"
                           >
                             <img
                               src={
@@ -472,8 +923,6 @@ export default function ChatWindow({
                             />
                           </button>
                         )}
-
-                        {/* TEXT */}
 
                         {msg.text && (
                           <p
@@ -494,8 +943,6 @@ export default function ChatWindow({
                           </p>
                         )}
 
-                        {/* TIME */}
-
                         {msg.time && (
                           <p
                             className="
@@ -514,15 +961,12 @@ export default function ChatWindow({
                 }
               )}
 
-              {/* Bottom space */}
-
               <div
                 className="
                   h-3
                   w-full
                   shrink-0
                 "
-                aria-hidden="true"
               />
             </>
           )}
@@ -531,10 +975,6 @@ export default function ChatWindow({
 
       {/* =================================================
           INPUT BAR
-
-          IMPORTANT:
-          This is OUTSIDE the scroll container.
-          Messages can never push it down.
       ================================================= */}
 
       <div
@@ -559,7 +999,7 @@ export default function ChatWindow({
             gap-2
           "
         >
-          {/* IMAGE BUTTON */}
+          {/* IMAGE */}
 
           <button
             type="button"
@@ -588,8 +1028,6 @@ export default function ChatWindow({
             🖼️
           </button>
 
-          {/* FILE INPUT */}
-
           <input
             ref={fileRef}
             type="file"
@@ -616,6 +1054,7 @@ export default function ChatWindow({
               border-[var(--glass-border)]
               bg-[var(--glass-bg-strong)]
               px-1.5
+              backdrop-blur-2xl
             "
           >
             <input
@@ -627,8 +1066,7 @@ export default function ChatWindow({
               }
               onKeyDown={(e) => {
                 if (
-                  e.key ===
-                    "Enter" &&
+                  e.key === "Enter" &&
                   !e.shiftKey
                 ) {
                   e.preventDefault();
@@ -655,8 +1093,6 @@ export default function ChatWindow({
                 disabled:opacity-50
               "
             />
-
-            {/* SEND */}
 
             <button
               type="button"

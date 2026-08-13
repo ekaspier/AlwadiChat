@@ -11,6 +11,7 @@ import { listenToAuth } from "@/lib/authListener";
 import {
   listenToMessages,
   sendMessage as sendFirestoreMessage,
+  clearChat,
 } from "@/lib/firebaseFirestore";
 
 // =========================================================
@@ -32,18 +33,27 @@ type ChatMessage = {
 };
 
 // =========================================================
+// ARCHIVE EVENT
+// =========================================================
+
+const ARCHIVE_EVENT =
+  "alwadi-chat-archive-changed";
+
+// =========================================================
 // HOME
 // =========================================================
 
 export default function Home() {
   const router = useRouter();
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] =
+    useState<any>(null);
 
   const [selectedUser, setSelectedUser] =
     useState<SelectedUser | null>(null);
 
-  const [showChat, setShowChat] = useState(false);
+  const [showChat, setShowChat] =
+    useState(false);
 
   const [messages, setMessages] =
     useState<ChatMessage[]>([]);
@@ -70,7 +80,7 @@ export default function Home() {
   }, [router]);
 
   // =======================================================
-  // LISTEN TO CURRENT CONVERSATION
+  // LISTEN TO CURRENT CHAT
   // =======================================================
 
   useEffect(() => {
@@ -79,27 +89,28 @@ export default function Home() {
       return;
     }
 
-    const unsubscribe = listenToMessages(
-      currentUser.uid,
-      selectedUser.id,
-      (data: any[]) => {
-        const formatted: ChatMessage[] =
-          data.map((msg: any) => ({
-            id: msg.id,
-            text: msg.text ?? "",
-            imageUrl: msg.imageUrl ?? null,
+    const unsubscribe =
+      listenToMessages(
+        currentUser.uid,
+        selectedUser.id,
+        (data: any[]) => {
+          const formatted: ChatMessage[] =
+            data.map((msg: any) => ({
+              id: msg.id,
+              text: msg.text ?? "",
+              imageUrl: msg.imageUrl ?? null,
 
-            sender:
-              msg.userId === currentUser.uid
-                ? "me"
-                : "other",
+              sender:
+                msg.userId === currentUser.uid
+                  ? "me"
+                  : "other",
 
-            time: "",
-          }));
+              time: "",
+            }));
 
-        setMessages(formatted);
-      }
-    );
+          setMessages(formatted);
+        }
+      );
 
     return () => {
       unsubscribe();
@@ -107,7 +118,7 @@ export default function Home() {
   }, [currentUser, selectedUser]);
 
   // =======================================================
-  // SELECT FRIEND
+  // SELECT USER
   // =======================================================
 
   function selectUser(user: SelectedUser) {
@@ -136,7 +147,161 @@ export default function Home() {
   }
 
   // =======================================================
-  // BACK ON MOBILE
+  // CLEAR CURRENT CHAT
+  // =======================================================
+
+  async function handleClearChat() {
+    if (!currentUser || !selectedUser) {
+      return;
+    }
+
+    try {
+      await clearChat(
+        currentUser.uid,
+        selectedUser.id
+      );
+
+      setMessages([]);
+    } catch (error) {
+      console.error(
+        "Failed to clear chat:",
+        error
+      );
+
+      throw error;
+    }
+  }
+
+  // =======================================================
+  // ARCHIVE CURRENT CHAT
+  // =======================================================
+
+  function handleArchiveChat() {
+    if (!currentUser || !selectedUser) {
+      return;
+    }
+
+    try {
+      const storageKey =
+        `alwadi-archived-chats-${currentUser.uid}`;
+
+      const saved =
+        localStorage.getItem(storageKey);
+
+      const archived: string[] =
+        saved ? JSON.parse(saved) : [];
+
+      if (
+        !archived.includes(selectedUser.id)
+      ) {
+        archived.push(selectedUser.id);
+      }
+
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify(archived)
+      );
+
+      // Notify Sidebar immediately
+      window.dispatchEvent(
+        new Event(ARCHIVE_EVENT)
+      );
+
+      // Close current chat
+      setSelectedUser(null);
+      setShowChat(false);
+      setMessages([]);
+    } catch (error) {
+      console.error(
+        "Failed to archive chat:",
+        error
+      );
+
+      throw error;
+    }
+  }
+
+  // =======================================================
+  // UNARCHIVE CURRENT CHAT
+  // =======================================================
+
+  function handleUnarchiveChat() {
+    if (!currentUser || !selectedUser) {
+      return;
+    }
+
+    try {
+      const storageKey =
+        `alwadi-archived-chats-${currentUser.uid}`;
+
+      const saved =
+        localStorage.getItem(storageKey);
+
+      const archived: string[] =
+        saved ? JSON.parse(saved) : [];
+
+      const updated =
+        archived.filter(
+          (id) => id !== selectedUser.id
+        );
+
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify(updated)
+      );
+
+      // Notify Sidebar
+      window.dispatchEvent(
+        new Event(ARCHIVE_EVENT)
+      );
+
+      // Return to main conversations
+      setSelectedUser(null);
+      setShowChat(false);
+      setMessages([]);
+    } catch (error) {
+      console.error(
+        "Failed to unarchive chat:",
+        error
+      );
+
+      throw error;
+    }
+  }
+
+  // =======================================================
+  // CHECK IF CHAT IS ARCHIVED
+  // =======================================================
+
+  function isChatArchived(
+    friendUid: string
+  ) {
+    if (!currentUser) {
+      return false;
+    }
+
+    try {
+      const storageKey =
+        `alwadi-archived-chats-${currentUser.uid}`;
+
+      const saved =
+        localStorage.getItem(storageKey);
+
+      if (!saved) {
+        return false;
+      }
+
+      const archived: string[] =
+        JSON.parse(saved);
+
+      return archived.includes(friendUid);
+    } catch {
+      return false;
+    }
+  }
+
+  // =======================================================
+  // BACK MOBILE
   // =======================================================
 
   function handleBack() {
@@ -148,174 +313,304 @@ export default function Home() {
   // =======================================================
 
   if (!currentUser) {
-    return null;
+    return (
+      <main
+        className="
+          flex
+          min-h-[100dvh]
+          items-center
+          justify-center
+          bg-[var(--background)]
+          text-[var(--text-primary)]
+        "
+      >
+        <div
+          className="
+            liquid-glass
+            flex
+            items-center
+            gap-3
+            rounded-full
+            px-6
+            py-4
+          "
+        >
+          <span
+            className="
+              h-2
+              w-2
+              animate-pulse
+              rounded-full
+              bg-emerald-400
+            "
+          />
+
+          <span className="text-sm">
+            جاري التحميل...
+          </span>
+        </div>
+      </main>
+    );
   }
 
   // =======================================================
-  // UI
+  // APP
   // =======================================================
 
   return (
     <main
+      dir="rtl"
       className="
+        relative
         flex
         h-[100dvh]
-        min-h-0
+        min-h-[100dvh]
         w-full
         overflow-hidden
         bg-[var(--background)]
+        text-[var(--text-primary)]
       "
     >
-      {/* =================================================
-          SIDEBAR
-      ================================================= */}
+      {/* AMBIENT LIGHT */}
 
-      <aside
-        className={`
-          relative
-          z-20
-          h-full
-          min-h-0
-          w-full
-          shrink-0
-          md:block
-          md:w-[360px]
-          lg:w-[390px]
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -left-32
+          -top-32
+          z-0
+          h-96
+          w-96
+          rounded-full
+          bg-blue-500/[0.08]
+          blur-[120px]
+        "
+      />
 
-          ${
-            showChat
-              ? "hidden md:block"
-              : "block"
-          }
-        `}
-      >
-        <Sidebar
-          setSelectedUser={selectUser}
-        />
-      </aside>
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -right-32
+          top-1/3
+          z-0
+          h-96
+          w-96
+          rounded-full
+          bg-purple-500/[0.07]
+          blur-[120px]
+        "
+      />
 
-      {/* =================================================
-          CHAT AREA
-      ================================================= */}
+      <div
+        className="
+          pointer-events-none
+          absolute
+          bottom-[-180px]
+          left-1/3
+          z-0
+          h-96
+          w-96
+          rounded-full
+          bg-cyan-500/[0.035]
+          blur-[130px]
+        "
+      />
 
-      <section
-        className={`
+      {/* APP FRAME */}
+
+      <div
+        className="
           relative
           z-10
           flex
           h-full
           min-h-0
-          min-w-0
-          flex-1
-          flex-col
+          w-full
           overflow-hidden
-
-          ${
-            showChat
-              ? "block"
-              : "hidden md:flex"
-          }
-        `}
+          bg-transparent
+        "
       >
-        {selectedUser ? (
-          <ChatWindow
-            user={selectedUser}
-            messages={messages}
-            sendMessage={sendMessage}
-            back={handleBack}
+        {/* SIDEBAR */}
+
+        <aside
+          className={`
+            relative
+            z-20
+            h-full
+            min-h-0
+            w-full
+            shrink-0
+            md:block
+            md:w-[360px]
+            lg:w-[390px]
+            xl:w-[410px]
+
+            ${
+              showChat
+                ? "hidden md:block"
+                : "block"
+            }
+          `}
+        >
+          <Sidebar
+            setSelectedUser={selectUser}
           />
-        ) : (
-          <div
-            className="
-              relative
-              flex
-              h-full
-              min-h-0
-              w-full
-              items-center
-              justify-center
-              overflow-hidden
-              bg-[var(--background)]
-            "
-          >
-            {/* Ambient background */}
+        </aside>
 
-            <div
-              className="
-                pointer-events-none
-                absolute
-                h-72
-                w-72
-                -translate-y-20
-                rounded-full
-                bg-blue-500/10
-                blur-3xl
-              "
+        {/* CHAT AREA */}
+
+        <section
+          className={`
+            relative
+            z-10
+            flex
+            h-full
+            min-h-0
+            min-w-0
+            flex-1
+            flex-col
+            overflow-hidden
+
+            ${
+              showChat
+                ? "block"
+                : "hidden md:flex"
+            }
+          `}
+        >
+          {selectedUser ? (
+            <ChatWindow
+              currentUserUid={currentUser.uid}
+              user={selectedUser}
+              messages={messages}
+              sendMessage={sendMessage}
+              back={handleBack}
+              onClearChat={handleClearChat}
+              onArchiveChat={
+                handleArchiveChat
+              }
+              onUnarchiveChat={
+                handleUnarchiveChat
+              }
+              isArchived={isChatArchived(
+                selectedUser.id
+              )}
             />
-
-            <div
-              className="
-                pointer-events-none
-                absolute
-                bottom-0
-                right-0
-                h-72
-                w-72
-                rounded-full
-                bg-purple-500/5
-                blur-3xl
-              "
-            />
-
-            {/* Empty state */}
-
+          ) : (
             <div
               className="
                 relative
-                z-10
-                mx-6
-                max-w-sm
-                text-center
+                flex
+                h-full
+                min-h-0
+                w-full
+                items-center
+                justify-center
+                overflow-hidden
+                bg-transparent
               "
             >
               <div
                 className="
-                  mx-auto
-                  mb-5
-                  flex
-                  h-20
-                  w-20
-                  items-center
-                  justify-center
-                  rounded-[28px]
-                  border
-                  border-[var(--glass-border)]
-                  bg-[var(--glass-bg-strong)]
-                  text-3xl
-                  shadow-[0_20px_60px_rgba(0,0,0,0.25)]
-                  backdrop-blur-2xl
+                  pointer-events-none
+                  absolute
+                  left-1/2
+                  top-1/2
+                  h-[420px]
+                  w-[420px]
+                  -translate-x-1/2
+                  -translate-y-1/2
+                  rounded-full
+                  bg-white/[0.025]
+                  blur-[100px]
                 "
-              >
-                💬
-              </div>
+              />
 
-              <h2 className="text-xl font-bold">
-                AlwadiChat
-              </h2>
-
-              <p
+              <div
                 className="
-                  mt-2
-                  text-sm
-                  text-[var(--text-muted)]
+                  relative
+                  z-10
+                  mx-6
+                  w-full
+                  max-w-md
+                  text-center
                 "
               >
-                اختر صديقاً لبدء المحادثة
-              </p>
+                <div
+                  className="
+                    liquid-glass-strong
+                    mx-auto
+                    flex
+                    h-24
+                    w-24
+                    items-center
+                    justify-center
+                    rounded-[30px]
+                    text-4xl
+                  "
+                >
+                  💬
+                </div>
+
+                <h1
+                  className="
+                    mt-7
+                    text-2xl
+                    font-bold
+                    tracking-tight
+                  "
+                >
+                  AlwadiChat
+                </h1>
+
+                <p
+                  className="
+                    mx-auto
+                    mt-3
+                    max-w-sm
+                    text-sm
+                    leading-7
+                    text-[var(--text-secondary)]
+                  "
+                >
+                  اختر محادثة من القائمة
+                  للبدء بالدردشة مع أصدقائك.
+                </p>
+
+                <div
+                  className="
+                    liquid-glass
+                    mx-auto
+                    mt-7
+                    flex
+                    w-fit
+                    items-center
+                    gap-2
+                    rounded-full
+                    px-4
+                    py-2.5
+                    text-xs
+                    text-[var(--text-muted)]
+                  "
+                >
+                  <span
+                    className="
+                      h-1.5
+                      w-1.5
+                      rounded-full
+                      bg-emerald-400
+                    "
+                  />
+
+                  آمن • سريع • خاص
+                </div>
+              </div>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
+      </div>
     </main>
   );
 }

@@ -29,6 +29,9 @@ type SidebarProps = {
   }) => void;
 };
 
+const ARCHIVE_EVENT =
+  "alwadi-chat-archive-changed";
+
 // =========================================================
 // SIDEBAR
 // =========================================================
@@ -54,13 +57,19 @@ export default function Sidebar({
   ] = useState<any[]>([]);
 
   const [
+    archivedIds,
+    setArchivedIds,
+  ] = useState<string[]>([]);
+
+  const [
+    showArchived,
+    setShowArchived,
+  ] = useState(false);
+
+  const [
     menuOpen,
     setMenuOpen,
   ] = useState(false);
-
-  // =======================================================
-  // DELETE ALL CHATS
-  // =======================================================
 
   const [
     showDeleteAllConfirm,
@@ -118,6 +127,96 @@ export default function Sidebar({
   }, [currentUser]);
 
   // =======================================================
+  // LOAD ARCHIVED CHATS
+  // =======================================================
+
+  function loadArchivedChats() {
+    if (!currentUser) {
+      setArchivedIds([]);
+      return;
+    }
+
+    try {
+      const storageKey =
+        `alwadi-archived-chats-${currentUser.uid}`;
+
+      const saved =
+        localStorage.getItem(
+          storageKey
+        );
+
+      if (!saved) {
+        setArchivedIds([]);
+        return;
+      }
+
+      const parsed =
+        JSON.parse(saved);
+
+      if (Array.isArray(parsed)) {
+        setArchivedIds(parsed);
+      } else {
+        setArchivedIds([]);
+      }
+    } catch (error) {
+      console.error(
+        "Failed to load archived chats:",
+        error
+      );
+
+      setArchivedIds([]);
+    }
+  }
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    loadArchivedChats();
+
+    function handleArchiveChanged() {
+      loadArchivedChats();
+    }
+
+    window.addEventListener(
+      ARCHIVE_EVENT,
+      handleArchiveChanged
+    );
+
+    return () => {
+      window.removeEventListener(
+        ARCHIVE_EVENT,
+        handleArchiveChanged
+      );
+    };
+  }, [currentUser]);
+
+  // =======================================================
+  // DERIVED FRIEND LIST
+  // =======================================================
+
+  const archivedFriends =
+    friends.filter((friend: any) =>
+      archivedIds.includes(
+        friend.uid
+      )
+    );
+
+  const activeFriends =
+    friends.filter(
+      (friend: any) =>
+        !archivedIds.includes(
+          friend.uid
+        )
+    );
+
+  const visibleFriends =
+    showArchived
+      ? archivedFriends
+      : activeFriends;
+
+  // =======================================================
   // LOGOUT
   // =======================================================
 
@@ -159,6 +258,24 @@ export default function Sidebar({
     });
 
     setMenuOpen(false);
+  }
+
+  // =======================================================
+  // OPEN ARCHIVE
+  // =======================================================
+
+  function openArchivedChats() {
+    loadArchivedChats();
+    setShowArchived(true);
+    setMenuOpen(false);
+  }
+
+  // =======================================================
+  // CLOSE ARCHIVE
+  // =======================================================
+
+  function closeArchivedChats() {
+    setShowArchived(false);
   }
 
   // =======================================================
@@ -236,9 +353,7 @@ export default function Sidebar({
 
   return (
     <>
-      {/* =================================================
-          AMBIENT BACKGROUND
-      ================================================= */}
+      {/* AMBIENT BACKGROUND */}
 
       <div
         className="
@@ -268,9 +383,7 @@ export default function Sidebar({
         "
       />
 
-      {/* =================================================
-          MAIN
-      ================================================= */}
+      {/* MAIN */}
 
       <div
         className="
@@ -282,9 +395,7 @@ export default function Sidebar({
           flex-col
         "
       >
-        {/* =================================================
-            HEADER
-        ================================================= */}
+        {/* HEADER */}
 
         <header
           className="
@@ -329,7 +440,9 @@ export default function Sidebar({
                   text-lg
                 "
               >
-                💬
+                {showArchived
+                  ? "📦"
+                  : "💬"}
               </div>
 
               <div className="min-w-0">
@@ -340,7 +453,9 @@ export default function Sidebar({
                     font-bold
                   "
                 >
-                  AlwadiChat
+                  {showArchived
+                    ? "المحادثات المؤرشفة"
+                    : "AlwadiChat"}
                 </h1>
 
                 <p
@@ -350,7 +465,9 @@ export default function Sidebar({
                     text-[var(--text-muted)]
                   "
                 >
-                  دردش مع أصدقائك
+                  {showArchived
+                    ? "محادثاتك المؤرشفة"
+                    : "دردش مع أصدقائك"}
                 </p>
               </div>
             </div>
@@ -381,9 +498,7 @@ export default function Sidebar({
           </div>
         </header>
 
-        {/* =================================================
-            FRIENDS TITLE
-        ================================================= */}
+        {/* TITLE */}
 
         <div
           className="
@@ -403,7 +518,9 @@ export default function Sidebar({
                 font-bold
               "
             >
-              الأصدقاء
+              {showArchived
+                ? "المحادثات المؤرشفة"
+                : "الأصدقاء"}
             </h2>
 
             <p
@@ -413,7 +530,10 @@ export default function Sidebar({
                 text-[var(--text-muted)]
               "
             >
-              {friends.length} أصدقاء
+              {visibleFriends.length}{" "}
+              {showArchived
+                ? "محادثات مؤرشفة"
+                : "أصدقاء"}
             </p>
           </div>
 
@@ -431,13 +551,45 @@ export default function Sidebar({
               text-[var(--text-secondary)]
             "
           >
-            {friends.length}
+            {visibleFriends.length}
           </div>
         </div>
 
-        {/* =================================================
-            FRIENDS LIST
-        ================================================= */}
+        {/* BACK FROM ARCHIVE */}
+
+        {showArchived && (
+          <div className="px-4 pb-3">
+            <button
+              type="button"
+              onClick={
+                closeArchivedChats
+              }
+              className="
+                glass-button
+                flex
+                w-full
+                items-center
+                gap-3
+                rounded-[18px]
+                px-4
+                py-3
+                text-right
+                text-sm
+                font-semibold
+              "
+            >
+              <span className="text-xl">
+                ‹
+              </span>
+
+              <span>
+                العودة للمحادثات الرئيسية
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* FRIENDS LIST */}
 
         <div
           className="
@@ -448,7 +600,7 @@ export default function Sidebar({
             pb-6
           "
         >
-          {friends.length === 0 ? (
+          {visibleFriends.length === 0 ? (
             <div
               className="
                 liquid-glass
@@ -473,11 +625,15 @@ export default function Sidebar({
                   text-3xl
                 "
               >
-                👥
+                {showArchived
+                  ? "📦"
+                  : "👥"}
               </div>
 
               <p className="font-semibold">
-                لا يوجد أصدقاء بعد
+                {showArchived
+                  ? "لا توجد محادثات مؤرشفة"
+                  : "لا يوجد أصدقاء بعد"}
               </p>
 
               <p
@@ -488,12 +644,14 @@ export default function Sidebar({
                   text-[var(--text-muted)]
                 "
               >
-                ابحث عن أشخاص وأرسل لهم طلب صداقة
+                {showArchived
+                  ? "المحادثات التي تقوم بأرشفتها ستظهر هنا."
+                  : "ابحث عن أشخاص وأرسل لهم طلب صداقة"}
               </p>
             </div>
           ) : (
             <div className="space-y-2">
-              {friends.map(
+              {visibleFriends.map(
                 (friend: any) => (
                   <button
                     key={friend.uid}
@@ -574,7 +732,9 @@ export default function Sidebar({
                           text-emerald-500/80
                         "
                       >
-                        متصل الآن
+                        {showArchived
+                          ? "مؤرشفة"
+                          : "متصل الآن"}
                       </p>
                     </div>
 
@@ -633,9 +793,7 @@ export default function Sidebar({
             "
             dir="rtl"
           >
-            {/* =================================================
-                MENU HEADER
-            ================================================= */}
+            {/* MENU HEADER */}
 
             <div
               className="
@@ -699,9 +857,7 @@ export default function Sidebar({
               </button>
             </div>
 
-            {/* =================================================
-                MENU CONTENT
-            ================================================= */}
+            {/* MENU CONTENT */}
 
             <div
               className="
@@ -773,12 +929,7 @@ export default function Sidebar({
                   </p>
                 </div>
 
-                <span
-                  className="
-                    text-lg
-                    text-white/30
-                  "
-                >
+                <span className="text-lg text-white/30">
                   ‹
                 </span>
               </button>
@@ -820,13 +971,7 @@ export default function Sidebar({
                     بحث
                   </p>
 
-                  <p
-                    className="
-                      mt-1
-                      text-xs
-                      text-white/40
-                    "
-                  >
+                  <p className="mt-1 text-xs text-white/40">
                     ابحث عن أصدقاء
                   </p>
                 </button>
@@ -858,6 +1003,61 @@ export default function Sidebar({
                     الطلبات
                   </p>
 
+                  <p className="mt-1 text-xs text-white/40">
+                    طلبات الصداقة
+                  </p>
+                </button>
+              </div>
+
+              {/* =================================================
+                  ARCHIVED CHATS
+              ================================================= */}
+
+              <button
+                type="button"
+                onClick={
+                  openArchivedChats
+                }
+                className="
+                  mt-3
+                  flex
+                  w-full
+                  cursor-pointer
+                  items-center
+                  gap-4
+                  rounded-[22px]
+                  border
+                  border-white/10
+                  bg-white/[0.055]
+                  p-4
+                  text-right
+                  text-white
+                  transition
+                  hover:bg-white/[0.10]
+                  active:scale-[0.98]
+                "
+              >
+                <div
+                  className="
+                    flex
+                    h-11
+                    w-11
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-[15px]
+                    bg-white/[0.08]
+                    text-xl
+                  "
+                >
+                  📦
+                </div>
+
+                <div className="flex-1">
+                  <p className="font-semibold">
+                    المحادثات المؤرشفة
+                  </p>
+
                   <p
                     className="
                       mt-1
@@ -865,14 +1065,17 @@ export default function Sidebar({
                       text-white/40
                     "
                   >
-                    طلبات الصداقة
+                    {archivedFriends.length}{" "}
+                    محادثة مؤرشفة
                   </p>
-                </button>
-              </div>
+                </div>
 
-              {/* =================================================
-                  APPEARANCE
-              ================================================= */}
+                <span className="text-lg text-white/30">
+                  ‹
+                </span>
+              </button>
+
+              {/* APPEARANCE */}
 
               <div
                 className="
@@ -912,13 +1115,7 @@ export default function Sidebar({
                       المظهر
                     </p>
 
-                    <p
-                      className="
-                        mt-1
-                        text-xs
-                        text-white/40
-                      "
-                    >
+                    <p className="mt-1 text-xs text-white/40">
                       اختر شكل التطبيق
                     </p>
                   </div>
@@ -983,9 +1180,7 @@ export default function Sidebar({
                 </div>
               </div>
 
-              {/* =================================================
-                  DELETE ALL CHATS
-              ================================================= */}
+              {/* DELETE ALL */}
 
               <button
                 type="button"
@@ -1033,30 +1228,17 @@ export default function Sidebar({
                 </div>
 
                 <div className="flex-1">
-                  <p
-                    className="
-                      font-semibold
-                      text-red-400
-                    "
-                  >
+                  <p className="font-semibold text-red-400">
                     حذف جميع المحادثات
                   </p>
 
-                  <p
-                    className="
-                      mt-1
-                      text-xs
-                      text-red-400/50
-                    "
-                  >
+                  <p className="mt-1 text-xs text-red-400/50">
                     حذف جميع الرسائل نهائياً
                   </p>
                 </div>
               </button>
 
-              {/* =================================================
-                  LOGOUT
-              ================================================= */}
+              {/* LOGOUT */}
 
               <button
                 type="button"
@@ -1097,22 +1279,11 @@ export default function Sidebar({
                 </div>
 
                 <div className="flex-1">
-                  <p
-                    className="
-                      font-semibold
-                      text-red-400
-                    "
-                  >
+                  <p className="font-semibold text-red-400">
                     تسجيل الخروج
                   </p>
 
-                  <p
-                    className="
-                      mt-1
-                      text-xs
-                      text-red-400/50
-                    "
-                  >
+                  <p className="mt-1 text-xs text-red-400/50">
                     الخروج من الحساب
                   </p>
                 </div>
@@ -1122,14 +1293,10 @@ export default function Sidebar({
         </>
       )}
 
-      {/* =================================================
-          DELETE ALL CONFIRMATION
-      ================================================= */}
+      {/* DELETE ALL CONFIRMATION */}
 
       {showDeleteAllConfirm && (
         <>
-          {/* BACKDROP */}
-
           <div
             className="
               fixed
@@ -1146,8 +1313,6 @@ export default function Sidebar({
               }
             }}
           />
-
-          {/* CONFIRM BOX */}
 
           <div
             className="
@@ -1168,8 +1333,6 @@ export default function Sidebar({
             "
             dir="rtl"
           >
-            {/* ICON */}
-
             <div
               className="
                 mx-auto
@@ -1186,8 +1349,6 @@ export default function Sidebar({
               🗑️
             </div>
 
-            {/* TITLE */}
-
             <h3
               className="
                 mt-5
@@ -1198,8 +1359,6 @@ export default function Sidebar({
             >
               حذف جميع المحادثات؟
             </h3>
-
-            {/* DESCRIPTION */}
 
             <p
               className="
@@ -1213,12 +1372,11 @@ export default function Sidebar({
               سيتم حذف جميع الرسائل
               الموجودة في جميع محادثاتك.
               <br />
+
               <span className="font-semibold text-red-400/80">
                 لا يمكن التراجع عن هذا الإجراء.
               </span>
             </p>
-
-            {/* BUTTONS */}
 
             <div
               className="
