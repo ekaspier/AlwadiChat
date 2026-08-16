@@ -6,34 +6,168 @@ import {
   useState,
 } from "react";
 
-import { uploadImage } from "@/lib/storage";
+import MessageInput from "@/components/chat/MessageInput";
+import VoiceMessage from "@/components/chat/VoiceMessage";
+
+import {
+  listenToUserPresence,
+  type UserPresence,
+  formatLastSeen,
+} from "@/lib/chat/presence";
 
 // =========================================================
 // TYPES
 // =========================================================
 
+type ReplyToMessage = {
+  id: string;
+  text?: string;
+  imageUrl?: string | null;
+  voiceUrl?: string | null;
+  userId?: string;
+};
+
+type ChatMessage = {
+  id: string;
+
+  text: string;
+
+  imageUrl: string | null;
+
+  voiceUrl: string | null;
+
+  voiceDuration: number | null;
+
+  sender: "me" | "other";
+
+  type: "text" | "image" | "voice" | "mixed";
+
+  userId: string;
+
+  createdAt: any;
+
+  updatedAt: any;
+
+  edited: boolean;
+
+  deleted: boolean;
+
+  replyTo: ReplyToMessage | null;
+
+  reactions: Record<string, string>;
+
+  seenBy: Record<string, boolean>;
+
+  time: string;
+};
+
+type User = {
+  id?: string;
+  uid?: string;
+  name?: string;
+  username?: string;
+  avatarUrl?: string | null;
+  photoURL?: string | null;
+  status?: string;
+  online?: boolean;
+};
+
 type ChatWindowProps = {
   currentUserUid: string;
 
-  user: any;
+  user: User;
 
-  messages: any[];
-
-  sendMessage: (
-    text: string,
-    imageUrl?: string | null
-  ) => Promise<void>;
+  messages: ChatMessage[];
 
   back: () => void;
 
   onClearChat: () => Promise<void>;
 
-  onArchiveChat: () => void;
+  onArchiveChat: () => void | Promise<void>;
 
-  onUnarchiveChat: () => void;
+  onUnarchiveChat: () => void | Promise<void>;
 
   isArchived: boolean;
 };
+
+// =========================================================
+// HELPERS
+// =========================================================
+
+function getFriendUid(
+  user: User
+): string {
+  return (
+    user.id ||
+    user.uid ||
+    ""
+  );
+}
+
+function getMessageDate(
+  timestamp: any
+): Date | null {
+  if (!timestamp) {
+    return null;
+  }
+
+  try {
+    if (
+      typeof timestamp.toDate ===
+      "function"
+    ) {
+      return timestamp.toDate();
+    }
+
+    if (
+      timestamp instanceof Date
+    ) {
+      return timestamp;
+    }
+
+    if (
+      typeof timestamp === "number"
+    ) {
+      return new Date(timestamp);
+    }
+
+    if (
+      typeof timestamp === "string"
+    ) {
+      const date =
+        new Date(timestamp);
+
+      return Number.isNaN(
+        date.getTime()
+      )
+        ? null
+        : date;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function formatTime(
+  timestamp: any
+): string {
+  const date =
+    getMessageDate(timestamp);
+
+  if (!date) {
+    return "";
+  }
+
+  return date.toLocaleTimeString(
+    "ar-DE",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+    }
+  );
+}
 
 // =========================================================
 // CHAT WINDOW
@@ -43,21 +177,19 @@ export default function ChatWindow({
   currentUserUid,
   user,
   messages,
-  sendMessage,
   back,
   onClearChat,
   onArchiveChat,
   onUnarchiveChat,
   isArchived,
 }: ChatWindowProps) {
-  const [message, setMessage] =
-    useState("");
+  const friendUid =
+    getFriendUid(user);
 
-  const [uploading, setUploading] =
-    useState(false);
-
-  const [menuOpen, setMenuOpen] =
-    useState(false);
+  const [
+    menuOpen,
+    setMenuOpen,
+  ] = useState(false);
 
   const [
     showDeleteConfirm,
@@ -69,11 +201,47 @@ export default function ChatWindow({
     setDeletingChat,
   ] = useState(false);
 
-  const fileRef =
-    useRef<HTMLInputElement | null>(null);
+  const [
+    presence,
+    setPresence,
+  ] = useState<UserPresence>({
+    userId: friendUid,
+    online: false,
+    lastSeen: null,
+  });
 
   const messagesContainerRef =
-    useRef<HTMLDivElement | null>(null);
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+  // =======================================================
+  // PRESENCE
+  // =======================================================
+
+  useEffect(() => {
+    if (!friendUid) {
+      setPresence({
+        userId: "",
+        online: false,
+        lastSeen: null,
+      });
+
+      return;
+    }
+
+    const unsubscribe =
+      listenToUserPresence(
+        friendUid,
+        (nextPresence) => {
+          setPresence(
+            nextPresence
+          );
+        }
+      );
+
+    return unsubscribe;
+  }, [friendUid]);
 
   // =======================================================
   // AUTO SCROLL
@@ -94,97 +262,13 @@ export default function ChatWindow({
   }, [messages]);
 
   // =======================================================
-  // SEND TEXT
-  // =======================================================
-
-  async function handleSend() {
-    const text =
-      message.trim();
-
-    if (
-      !text ||
-      uploading
-    ) {
-      return;
-    }
-
-    try {
-      await sendMessage(text);
-
-      setMessage("");
-    } catch (error) {
-      console.error(
-        "Message sending failed:",
-        error
-      );
-
-      alert(
-        "فشل إرسال الرسالة"
-      );
-    }
-  }
-
-  // =======================================================
-  // SEND IMAGE
-  // =======================================================
-
-  async function handleImage(
-    e: React.ChangeEvent<HTMLInputElement>
-  ) {
-    const file =
-      e.target.files?.[0];
-
-    if (!file) {
-      return;
-    }
-
-    if (
-      file.size >
-      10 * 1024 * 1024
-    ) {
-      alert(
-        "حجم الصورة يجب أن يكون أقل من 10MB"
-      );
-
-      e.target.value = "";
-
-      return;
-    }
-
-    try {
-      setUploading(true);
-
-      const imageUrl =
-        await uploadImage(file);
-
-      await sendMessage(
-        "",
-        imageUrl
-      );
-    } catch (error) {
-      console.error(
-        "Image upload failed:",
-        error
-      );
-
-      alert(
-        "فشل رفع الصورة"
-      );
-    } finally {
-      setUploading(false);
-
-      e.target.value = "";
-    }
-  }
-
-  // =======================================================
   // DELETE CHAT
   // =======================================================
 
   async function confirmDeleteChat() {
     if (
       !currentUserUid ||
-      !user?.id ||
+      !friendUid ||
       deletingChat
     ) {
       return;
@@ -215,9 +299,9 @@ export default function ChatWindow({
   // ARCHIVE
   // =======================================================
 
-  function handleArchive() {
+  async function handleArchive() {
     try {
-      onArchiveChat();
+      await onArchiveChat();
 
       setMenuOpen(false);
     } catch (error) {
@@ -236,9 +320,9 @@ export default function ChatWindow({
   // UNARCHIVE
   // =======================================================
 
-  function handleUnarchive() {
+  async function handleUnarchive() {
     try {
-      onUnarchiveChat();
+      await onUnarchiveChat();
 
       setMenuOpen(false);
     } catch (error) {
@@ -246,8 +330,26 @@ export default function ChatWindow({
         "Unarchive chat failed:",
         error
       );
+
+      alert(
+        "فشل إلغاء الأرشفة"
+      );
     }
   }
+
+  // =======================================================
+  // USER
+  // =======================================================
+
+  const avatarUrl =
+    user.avatarUrl ||
+    user.photoURL ||
+    null;
+
+  const userName =
+    user.name ||
+    user.username ||
+    "مستخدم";
 
   // =======================================================
   // UI
@@ -265,11 +367,8 @@ export default function ChatWindow({
         overflow-hidden
         bg-[var(--background)]
       "
+      dir="rtl"
     >
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
       <header
         className="
           relative
@@ -287,8 +386,6 @@ export default function ChatWindow({
           sm:px-5
         "
       >
-        {/* BACK */}
-
         <button
           type="button"
           onClick={back}
@@ -312,8 +409,6 @@ export default function ChatWindow({
           ‹
         </button>
 
-        {/* AVATAR */}
-
         <div
           className="
             relative
@@ -333,11 +428,24 @@ export default function ChatWindow({
             font-bold
           "
         >
-          {user?.name?.[0]
-            ?.toUpperCase() || "U"}
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={userName}
+              className="
+                h-full
+                w-full
+                object-cover
+              "
+            />
+          ) : (
+            userName
+              .charAt(0)
+              .toUpperCase()
+          )}
 
           <span
-            className="
+            className={`
               absolute
               bottom-0
               right-0
@@ -346,19 +454,16 @@ export default function ChatWindow({
               rounded-full
               border-2
               border-[var(--background)]
-              bg-emerald-400
-            "
+              ${
+                presence.online
+                  ? "bg-emerald-400"
+                  : "bg-zinc-500"
+              }
+            `}
           />
         </div>
 
-        {/* USER INFO */}
-
-        <div
-          className="
-            min-w-0
-            flex-1
-          "
-        >
+        <div className="min-w-0 flex-1">
           <h2
             className="
               truncate
@@ -367,25 +472,30 @@ export default function ChatWindow({
               sm:text-lg
             "
           >
-            {user?.name ||
-              "مستخدم"}
+            {userName}
           </h2>
 
           <div
             className="
               mt-0.5
               flex
+              min-w-0
               items-center
               gap-1.5
             "
           >
             <span
-              className="
+              className={`
                 h-1.5
                 w-1.5
+                shrink-0
                 rounded-full
-                bg-emerald-400
-              "
+                ${
+                  presence.online
+                    ? "bg-emerald-400"
+                    : "bg-zinc-500"
+                }
+              `}
             />
 
             <p
@@ -396,13 +506,16 @@ export default function ChatWindow({
                 sm:text-sm
               "
             >
-              {user?.status ||
-                "متصل"}
+              {presence.online
+                ? "متصل الآن"
+                : presence.lastSeen
+                ? `آخر ظهور ${formatLastSeen(
+                    presence.lastSeen
+                  )}`
+                : "غير متصل"}
             </p>
           </div>
         </div>
-
-        {/* CALL */}
 
         <button
           type="button"
@@ -426,8 +539,6 @@ export default function ChatWindow({
           📞
         </button>
 
-        {/* VIDEO */}
-
         <button
           type="button"
           aria-label="مكالمة فيديو"
@@ -450,14 +561,11 @@ export default function ChatWindow({
           📹
         </button>
 
-        {/* MENU */}
-
         <button
           type="button"
           onClick={() =>
             setMenuOpen(
-              (current) =>
-                !current
+              (value) => !value
             )
           }
           aria-label="خيارات المحادثة"
@@ -482,9 +590,7 @@ export default function ChatWindow({
         </button>
       </header>
 
-      {/* =================================================
-          CHAT MENU
-      ================================================= */}
+      {/* MENU */}
 
       {menuOpen && (
         <>
@@ -511,10 +617,7 @@ export default function ChatWindow({
               w-[240px]
               p-2
             "
-            dir="rtl"
           >
-            {/* ARCHIVE / UNARCHIVE */}
-
             <button
               type="button"
               onClick={
@@ -551,16 +654,11 @@ export default function ChatWindow({
               </span>
             </button>
 
-            {/* DELETE */}
-
             <button
               type="button"
               onClick={() => {
                 setMenuOpen(false);
-
-                setShowDeleteConfirm(
-                  true
-                );
+                setShowDeleteConfirm(true);
               }}
               disabled={deletingChat}
               className="
@@ -595,9 +693,7 @@ export default function ChatWindow({
         </>
       )}
 
-      {/* =================================================
-          DELETE CONFIRMATION
-      ================================================= */}
+      {/* DELETE CONFIRMATION */}
 
       {showDeleteConfirm && (
         <>
@@ -611,9 +707,7 @@ export default function ChatWindow({
             "
             onClick={() => {
               if (!deletingChat) {
-                setShowDeleteConfirm(
-                  false
-                );
+                setShowDeleteConfirm(false);
               }
             }}
           />
@@ -636,7 +730,6 @@ export default function ChatWindow({
               shadow-[0_30px_100px_rgba(0,0,0,0.7)]
               backdrop-blur-3xl
             "
-            dir="rtl"
           >
             <div
               className="
@@ -675,9 +768,7 @@ export default function ChatWindow({
               "
             >
               سيتم حذف جميع الرسائل
-              مع{" "}
-              {user?.name ||
-                "هذا المستخدم"}.
+              مع {userName}.
               <br />
 
               <span
@@ -703,9 +794,7 @@ export default function ChatWindow({
                 type="button"
                 disabled={deletingChat}
                 onClick={() =>
-                  setShowDeleteConfirm(
-                    false
-                  )
+                  setShowDeleteConfirm(false)
                 }
                 className="
                   rounded-[16px]
@@ -719,7 +808,6 @@ export default function ChatWindow({
                   transition
                   hover:bg-white/[0.10]
                   active:scale-[0.98]
-                  disabled:cursor-not-allowed
                   disabled:opacity-40
                 "
               >
@@ -742,7 +830,6 @@ export default function ChatWindow({
                   transition
                   hover:bg-red-600
                   active:scale-[0.98]
-                  disabled:cursor-not-allowed
                   disabled:opacity-50
                 "
               >
@@ -755,9 +842,7 @@ export default function ChatWindow({
         </>
       )}
 
-      {/* =================================================
-          MESSAGES
-      ================================================= */}
+      {/* MESSAGES */}
 
       <div
         ref={messagesContainerRef}
@@ -835,28 +920,30 @@ export default function ChatWindow({
                     text-[var(--text-secondary)]
                   "
                 >
-                  أرسل أول رسالة
-                  إلى{" "}
-                  {user?.name ||
-                    "صديقك"}
+                  أرسل أول رسالة إلى{" "}
+                  {userName}
                 </p>
               </div>
             </div>
           ) : (
             <>
               {messages.map(
-                (
-                  msg: any,
-                  index: number
-                ) => {
+                (msg, index) => {
                   const isMine =
-                    msg.sender === "me";
+                    msg.userId ===
+                    currentUserUid;
+
+                  const time =
+                    msg.time ||
+                    formatTime(
+                      msg.createdAt
+                    );
 
                   return (
                     <div
                       key={
                         msg.id ||
-                        index
+                        `message-${index}`
                       }
                       className={`
                         flex
@@ -896,64 +983,155 @@ export default function ChatWindow({
                           }
                         `}
                       >
-                        {msg.imageUrl && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              window.open(
-                                msg.imageUrl,
-                                "_blank",
-                                "noopener,noreferrer"
-                              )
-                            }
-                            className="block w-full"
-                          >
-                            <img
-                              src={
-                                msg.imageUrl
-                              }
-                              alt="صورة مرسلة"
-                              className="
-                                block
-                                max-h-[360px]
-                                max-w-full
-                                rounded-[18px]
-                                object-cover
-                              "
-                            />
-                          </button>
-                        )}
-
-                        {msg.text && (
-                          <p
-                            className={`
-                              break-words
-                              whitespace-pre-wrap
-                              text-[15px]
-                              leading-6
-
-                              ${
-                                msg.imageUrl
-                                  ? "mt-2"
-                                  : ""
-                              }
-                            `}
-                          >
-                            {msg.text}
-                          </p>
-                        )}
-
-                        {msg.time && (
+                        {msg.deleted ? (
                           <p
                             className="
-                              mt-1.5
-                              text-right
-                              text-[10px]
-                              opacity-50
+                              italic
+                              text-sm
+                              opacity-60
                             "
                           >
-                            {msg.time}
+                            تم حذف هذه الرسالة
                           </p>
+                        ) : (
+                          <>
+                            {msg.replyTo && (
+                              <div
+                                className="
+                                  mb-2
+                                  rounded-xl
+                                  border
+                                  border-black/10
+                                  bg-black/10
+                                  px-3
+                                  py-2
+                                  text-xs
+                                "
+                              >
+                                <div className="font-semibold opacity-70">
+                                  رد على رسالة
+                                </div>
+
+                                <div className="mt-1 truncate opacity-60">
+                                  {msg.replyTo.text ||
+                                    (msg.replyTo.imageUrl
+                                      ? "📷 صورة"
+                                      : msg.replyTo.voiceUrl
+                                      ? "🎤 رسالة صوتية"
+                                      : "رسالة")}
+                                </div>
+                              </div>
+                            )}
+
+                            {msg.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  window.open(
+                                    msg.imageUrl!,
+                                    "_blank",
+                                    "noopener,noreferrer"
+                                  )
+                                }
+                                className="block w-full"
+                              >
+                                <img
+                                  src={
+                                    msg.imageUrl
+                                  }
+                                  alt="صورة مرسلة"
+                                  className="
+                                    block
+                                    max-h-[360px]
+                                    max-w-full
+                                    rounded-[18px]
+                                    object-cover
+                                  "
+                                />
+                              </button>
+                            )}
+
+                            {msg.voiceUrl && (
+                              <div
+                                className={`
+                                  ${
+                                    msg.imageUrl
+                                      ? "mt-2"
+                                      : ""
+                                  }
+                                  min-w-[230px]
+                                `}
+                              >
+                                <VoiceMessage
+                                  voiceUrl={
+                                    msg.voiceUrl
+                                  }
+                                  duration={
+                                    msg.voiceDuration ??
+                                    0
+                                  }
+                                  isMine={
+                                    isMine
+                                  }
+                                />
+                              </div>
+                            )}
+
+                            {msg.text && (
+                              <p
+                                className={`
+                                  break-words
+                                  whitespace-pre-wrap
+                                  text-[15px]
+                                  leading-6
+                                  ${
+                                    msg.imageUrl ||
+                                    msg.voiceUrl
+                                      ? "mt-2"
+                                      : ""
+                                  }
+                                `}
+                              >
+                                {msg.text}
+                              </p>
+                            )}
+
+                            {time && (
+                              <div
+                                className="
+                                  mt-1.5
+                                  flex
+                                  items-center
+                                  justify-end
+                                  gap-1.5
+                                  text-[10px]
+                                  opacity-50
+                                "
+                              >
+                                {msg.edited && (
+                                  <span>
+                                    معدلة
+                                  </span>
+                                )}
+
+                                <span>
+                                  {time}
+                                </span>
+
+                                {isMine && (
+                                  <span>
+                                    {msg.seenBy &&
+                                    friendUid &&
+                                    msg.seenBy[
+                                      friendUid
+                                    ]
+                                      ? "✓✓"
+                                      : "✓"}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -961,21 +1139,13 @@ export default function ChatWindow({
                 }
               )}
 
-              <div
-                className="
-                  h-3
-                  w-full
-                  shrink-0
-                "
-              />
+              <div className="h-3 w-full shrink-0" />
             </>
           )}
         </div>
       </div>
 
-      {/* =================================================
-          INPUT BAR
-      ================================================= */}
+      {/* INPUT */}
 
       <div
         className="
@@ -983,149 +1153,74 @@ export default function ChatWindow({
           border-t
           border-[var(--glass-border)]
           bg-[var(--background)]
-          px-3
-          py-3
-          pb-[max(12px,env(safe-area-inset-bottom))]
-          sm:px-5
+          pb-[env(safe-area-inset-bottom)]
         "
       >
         <div
           className="
             mx-auto
-            flex
             w-full
             max-w-4xl
-            items-center
-            gap-2
           "
         >
-          {/* IMAGE */}
-
-          <button
-            type="button"
-            onClick={() =>
-              fileRef.current?.click()
-            }
-            disabled={uploading}
-            aria-label="إرسال صورة"
-            className="
-              glass-button
-              flex
-              h-12
-              w-12
-              min-w-12
-              shrink-0
-              items-center
-              justify-center
-              rounded-full
-              text-xl
-              transition
-              active:scale-90
-              disabled:cursor-not-allowed
-              disabled:opacity-40
-            "
-          >
-            🖼️
-          </button>
-
-          <input
-            ref={fileRef}
-            type="file"
-            accept="
-              image/jpeg,
-              image/png,
-              image/webp,
-              image/gif
-            "
-            hidden
-            onChange={handleImage}
-          />
-
-          {/* MESSAGE BAR */}
-
-          <div
-            className="
-              flex
-              min-w-0
-              flex-1
-              items-center
-              rounded-[26px]
-              border
-              border-[var(--glass-border)]
-              bg-[var(--glass-bg-strong)]
-              px-1.5
-              backdrop-blur-2xl
-            "
-          >
-            <input
-              value={message}
-              onChange={(e) =>
-                setMessage(
-                  e.target.value
-                )
-              }
-              onKeyDown={(e) => {
-                if (
-                  e.key === "Enter" &&
-                  !e.shiftKey
-                ) {
-                  e.preventDefault();
-
-                  handleSend();
-                }
-              }}
-              disabled={uploading}
-              placeholder={
-                uploading
-                  ? "جاري رفع الصورة..."
-                  : "اكتب رسالة..."
-              }
-              className="
-                min-w-0
-                flex-1
-                bg-transparent
-                px-3
-                py-2.5
-                text-[15px]
-                text-[var(--text-primary)]
-                outline-none
-                placeholder:text-[var(--text-muted)]
-                disabled:opacity-50
-              "
-            />
-
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={
-                uploading ||
-                !message.trim()
-              }
-              aria-label="إرسال الرسالة"
+          {isArchived ? (
+            <div
               className="
                 flex
-                h-10
-                w-10
-                min-w-10
-                shrink-0
                 items-center
-                justify-center
-                rounded-full
-                bg-[var(--accent)]
-                text-[var(--accent-foreground)]
-                text-base
-                font-bold
-                transition
-                active:scale-90
-                disabled:cursor-not-allowed
-                disabled:opacity-30
+                justify-between
+                gap-3
+                px-4
+                py-4
+                text-sm
               "
             >
-              {uploading
-                ? "…"
-                : "➤"}
-            </button>
-          </div>
+              <span className="text-[var(--text-secondary)]">
+                هذه المحادثة مؤرشفة
+              </span>
+
+              <button
+                type="button"
+                onClick={
+                  handleUnarchive
+                }
+                className="
+                  rounded-xl
+                  bg-[var(--accent)]
+                  px-4
+                  py-2
+                  font-semibold
+                  text-[var(--accent-foreground)]
+                  transition
+                  hover:opacity-90
+                "
+              >
+                إلغاء الأرشفة
+              </button>
+            </div>
+          ) : (
+            <MessageInput
+              myUid={
+                currentUserUid
+              }
+              friendUid={
+                friendUid
+              }
+              onMessageSent={() => {
+                requestAnimationFrame(
+                  () => {
+                    const container =
+                      messagesContainerRef.current;
+
+                    if (container) {
+                      container.scrollTop =
+                        container.scrollHeight;
+                    }
+                  }
+                );
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

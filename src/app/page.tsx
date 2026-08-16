@@ -10,8 +10,10 @@ import { listenToAuth } from "@/lib/authListener";
 
 import {
   listenToMessages,
-  sendMessage as sendFirestoreMessage,
   clearChat,
+  isChatArchived as isChatArchivedFirestore,
+  archiveChat,
+  unarchiveChat,
 } from "@/lib/firebaseFirestore";
 
 // =========================================================
@@ -24,20 +26,82 @@ type SelectedUser = {
   status?: string;
 };
 
-type ChatMessage = {
-  id?: string;
+type ReplyToMessage = {
+  id: string;
   text?: string;
   imageUrl?: string | null;
+  voiceUrl?: string | null;
+  userId?: string;
+};
+
+type ChatMessage = {
+  id: string;
+
+  text: string;
+
+  imageUrl: string | null;
+
+  voiceUrl: string | null;
+
+  voiceDuration: number | null;
+
   sender: "me" | "other";
-  time?: string;
+
+  type: "text" | "image" | "voice" | "mixed";
+
+  userId: string;
+
+  createdAt: any;
+
+  updatedAt: any;
+
+  edited: boolean;
+
+  deleted: boolean;
+
+  replyTo: ReplyToMessage | null;
+
+  reactions: Record<string, string>;
+
+  seenBy: Record<string, boolean>;
+
+  time: string;
 };
 
 // =========================================================
-// ARCHIVE EVENT
+// HELPERS
 // =========================================================
 
-const ARCHIVE_EVENT =
-  "alwadi-chat-archive-changed";
+function formatMessageTime(createdAt: any): string {
+  if (!createdAt) {
+    return "";
+  }
+
+  try {
+    let date: Date | null = null;
+
+    if (typeof createdAt?.toDate === "function") {
+      date = createdAt.toDate();
+    } else if (createdAt instanceof Date) {
+      date = createdAt;
+    } else if (typeof createdAt === "number") {
+      date = new Date(createdAt);
+    } else if (typeof createdAt === "string") {
+      date = new Date(createdAt);
+    }
+
+    if (!date || Number.isNaN(date.getTime())) {
+      return "";
+    }
+
+    return date.toLocaleTimeString("ar-DE", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
 
 // =========================================================
 // HOME
@@ -58,21 +122,22 @@ export default function Home() {
   const [messages, setMessages] =
     useState<ChatMessage[]>([]);
 
+  const [archivedState, setArchivedState] =
+    useState(false);
+
   // =======================================================
-  // AUTHENTICATION
+  // AUTH
   // =======================================================
 
   useEffect(() => {
-    const unsubscribe = listenToAuth(
-      (user: any) => {
-        if (!user) {
-          router.push("/login");
-          return;
-        }
-
-        setCurrentUser(user);
+    const unsubscribe = listenToAuth((user: any) => {
+      if (!user) {
+        router.push("/login");
+        return;
       }
-    );
+
+      setCurrentUser(user);
+    });
 
     return () => {
       unsubscribe();
@@ -84,38 +149,115 @@ export default function Home() {
   // =======================================================
 
   useEffect(() => {
-    if (!currentUser || !selectedUser) {
+    if (!currentUser?.uid || !selectedUser?.id) {
       setMessages([]);
+      setArchivedState(false);
       return;
     }
 
-    const unsubscribe =
-      listenToMessages(
-        currentUser.uid,
-        selectedUser.id,
-        (data: any[]) => {
-          const formatted: ChatMessage[] =
-            data.map((msg: any) => ({
-              id: msg.id,
-              text: msg.text ?? "",
-              imageUrl: msg.imageUrl ?? null,
+    let cancelled = false;
 
-              sender:
-                msg.userId === currentUser.uid
-                  ? "me"
-                  : "other",
+    const myUid: string = currentUser.uid;
+    const friendUid: string = selectedUser.id;
 
-              time: "",
-            }));
+    async function loadArchiveState() {
+      try {
+        const archived =
+          await isChatArchivedFirestore(
+            myUid,
+            friendUid
+          );
 
-          setMessages(formatted);
+        if (!cancelled) {
+          setArchivedState(archived);
         }
-      );
+      } catch (error) {
+        console.error(
+          "Failed to check archive state:",
+          error
+        );
+
+        if (!cancelled) {
+          setArchivedState(false);
+        }
+      }
+    }
+
+    void loadArchiveState();
+
+    const unsubscribe = listenToMessages(
+      myUid,
+      friendUid,
+      (data) => {
+        if (cancelled) {
+          return;
+        }
+
+        const formatted: ChatMessage[] =
+          data.map((msg) => ({
+            id: msg.id,
+
+            text: msg.text ?? "",
+
+            imageUrl:
+              msg.imageUrl ?? null,
+
+            voiceUrl:
+              msg.voiceUrl ?? null,
+
+            voiceDuration:
+              msg.voiceDuration ?? null,
+
+            sender:
+              msg.userId === myUid
+                ? "me"
+                : "other",
+
+            type:
+              msg.type ?? "text",
+
+            userId:
+              msg.userId ?? "",
+
+            createdAt:
+              msg.createdAt ?? null,
+
+            updatedAt:
+              msg.updatedAt ?? null,
+
+            edited:
+              msg.edited ?? false,
+
+            deleted:
+              msg.deleted ?? false,
+
+            replyTo:
+              msg.replyTo ?? null,
+
+            reactions:
+              msg.reactions ?? {},
+
+            seenBy:
+              msg.seenBy ?? {},
+
+            time:
+              formatMessageTime(
+                msg.createdAt
+              ),
+          }));
+
+        setMessages(formatted);
+      }
+    );
 
     return () => {
+      cancelled = true;
       unsubscribe();
     };
-  }, [currentUser, selectedUser]);
+  }, [
+    currentUser?.uid,
+    selectedUser?.id,
+  ]);
 
   // =======================================================
   // SELECT USER
@@ -127,181 +269,105 @@ export default function Home() {
   }
 
   // =======================================================
-  // SEND MESSAGE
-  // =======================================================
-
-  async function sendMessage(
-    text: string,
-    imageUrl: string | null = null
-  ) {
-    if (!currentUser || !selectedUser) {
-      return;
-    }
-
-    await sendFirestoreMessage(
-      currentUser.uid,
-      selectedUser.id,
-      text,
-      imageUrl
-    );
-  }
-
-  // =======================================================
-  // CLEAR CURRENT CHAT
+  // CLEAR CHAT
   // =======================================================
 
   async function handleClearChat() {
-    if (!currentUser || !selectedUser) {
+    if (
+      !currentUser?.uid ||
+      !selectedUser?.id
+    ) {
       return;
     }
 
-    try {
-      await clearChat(
-        currentUser.uid,
-        selectedUser.id
-      );
+    const myUid: string =
+      currentUser.uid;
 
-      setMessages([]);
-    } catch (error) {
-      console.error(
-        "Failed to clear chat:",
-        error
-      );
+    const friendUid: string =
+      selectedUser.id;
 
-      throw error;
-    }
+    await clearChat(
+      myUid,
+      friendUid
+    );
+
+    setMessages([]);
   }
 
   // =======================================================
-  // ARCHIVE CURRENT CHAT
+  // ARCHIVE
   // =======================================================
 
-  function handleArchiveChat() {
-    if (!currentUser || !selectedUser) {
+  async function handleArchiveChat() {
+    if (
+      !currentUser?.uid ||
+      !selectedUser?.id
+    ) {
       return;
     }
 
-    try {
-      const storageKey =
-        `alwadi-archived-chats-${currentUser.uid}`;
+    const myUid: string =
+      currentUser.uid;
 
-      const saved =
-        localStorage.getItem(storageKey);
+    const friendUid: string =
+      selectedUser.id;
 
-      const archived: string[] =
-        saved ? JSON.parse(saved) : [];
+    await archiveChat(
+      myUid,
+      friendUid
+    );
 
-      if (
-        !archived.includes(selectedUser.id)
-      ) {
-        archived.push(selectedUser.id);
-      }
+    setArchivedState(true);
 
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify(archived)
-      );
+    window.dispatchEvent(
+      new Event(
+        "alwadi-chat-archive-changed"
+      )
+    );
 
-      // Notify Sidebar immediately
-      window.dispatchEvent(
-        new Event(ARCHIVE_EVENT)
-      );
-
-      // Close current chat
-      setSelectedUser(null);
-      setShowChat(false);
-      setMessages([]);
-    } catch (error) {
-      console.error(
-        "Failed to archive chat:",
-        error
-      );
-
-      throw error;
-    }
+    setSelectedUser(null);
+    setShowChat(false);
+    setMessages([]);
   }
 
   // =======================================================
-  // UNARCHIVE CURRENT CHAT
+  // UNARCHIVE
   // =======================================================
 
-  function handleUnarchiveChat() {
-    if (!currentUser || !selectedUser) {
+  async function handleUnarchiveChat() {
+    if (
+      !currentUser?.uid ||
+      !selectedUser?.id
+    ) {
       return;
     }
 
-    try {
-      const storageKey =
-        `alwadi-archived-chats-${currentUser.uid}`;
+    const myUid: string =
+      currentUser.uid;
 
-      const saved =
-        localStorage.getItem(storageKey);
+    const friendUid: string =
+      selectedUser.id;
 
-      const archived: string[] =
-        saved ? JSON.parse(saved) : [];
+    await unarchiveChat(
+      myUid,
+      friendUid
+    );
 
-      const updated =
-        archived.filter(
-          (id) => id !== selectedUser.id
-        );
+    setArchivedState(false);
 
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify(updated)
-      );
+    window.dispatchEvent(
+      new Event(
+        "alwadi-chat-archive-changed"
+      )
+    );
 
-      // Notify Sidebar
-      window.dispatchEvent(
-        new Event(ARCHIVE_EVENT)
-      );
-
-      // Return to main conversations
-      setSelectedUser(null);
-      setShowChat(false);
-      setMessages([]);
-    } catch (error) {
-      console.error(
-        "Failed to unarchive chat:",
-        error
-      );
-
-      throw error;
-    }
+    setSelectedUser(null);
+    setShowChat(false);
+    setMessages([]);
   }
 
   // =======================================================
-  // CHECK IF CHAT IS ARCHIVED
-  // =======================================================
-
-  function isChatArchived(
-    friendUid: string
-  ) {
-    if (!currentUser) {
-      return false;
-    }
-
-    try {
-      const storageKey =
-        `alwadi-archived-chats-${currentUser.uid}`;
-
-      const saved =
-        localStorage.getItem(storageKey);
-
-      if (!saved) {
-        return false;
-      }
-
-      const archived: string[] =
-        JSON.parse(saved);
-
-      return archived.includes(friendUid);
-    } catch {
-      return false;
-    }
-  }
-
-  // =======================================================
-  // BACK MOBILE
+  // BACK
   // =======================================================
 
   function handleBack() {
@@ -371,8 +437,6 @@ export default function Home() {
         text-[var(--text-primary)]
       "
     >
-      {/* AMBIENT LIGHT */}
-
       <div
         className="
           pointer-events-none
@@ -418,8 +482,6 @@ export default function Home() {
         "
       />
 
-      {/* APP FRAME */}
-
       <div
         className="
           relative
@@ -432,8 +494,6 @@ export default function Home() {
           bg-transparent
         "
       >
-        {/* SIDEBAR */}
-
         <aside
           className={`
             relative
@@ -459,8 +519,6 @@ export default function Home() {
           />
         </aside>
 
-        {/* CHAT AREA */}
-
         <section
           className={`
             relative
@@ -482,21 +540,31 @@ export default function Home() {
         >
           {selectedUser ? (
             <ChatWindow
-              currentUserUid={currentUser.uid}
+              currentUserUid={
+                currentUser.uid
+              }
+
               user={selectedUser}
+
               messages={messages}
-              sendMessage={sendMessage}
+
               back={handleBack}
-              onClearChat={handleClearChat}
+
+              onClearChat={
+                handleClearChat
+              }
+
               onArchiveChat={
                 handleArchiveChat
               }
+
               onUnarchiveChat={
                 handleUnarchiveChat
               }
-              isArchived={isChatArchived(
-                selectedUser.id
-              )}
+
+              isArchived={
+                archivedState
+              }
             />
           ) : (
             <div

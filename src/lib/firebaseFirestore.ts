@@ -1,19 +1,20 @@
+
 import {
-  collection,
   addDoc,
-  query,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
-  getDocs,
+  collection,
   deleteDoc,
   doc,
-  setDoc,
-  updateDoc,
   getDoc,
-  writeBatch,
+  getDocs,
   limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
   Timestamp,
+  updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 
 import { db } from "./firebase";
@@ -69,16 +70,12 @@ export type FirestoreChatMessage = {
 // =========================================================
 // CHAT ID
 // =========================================================
-// إنشاء معرف ثابت بين أي مستخدمين.
-// =========================================================
 
 export function getChatId(
   uid1: string,
   uid2: string
 ): string {
-  return [uid1, uid2]
-    .sort()
-    .join("_");
+  return [uid1, uid2].sort().join("_");
 }
 
 // =========================================================
@@ -89,11 +86,10 @@ function getMessagesCollection(
   myUid: string,
   friendUid: string
 ) {
-  const chatId =
-    getChatId(
-      myUid,
-      friendUid
-    );
+  const chatId = getChatId(
+    myUid,
+    friendUid
+  );
 
   return collection(
     db,
@@ -107,11 +103,10 @@ function getChatDocument(
   myUid: string,
   friendUid: string
 ) {
-  const chatId =
-    getChatId(
-      myUid,
-      friendUid
-    );
+  const chatId = getChatId(
+    myUid,
+    friendUid
+  );
 
   return doc(
     db,
@@ -121,13 +116,60 @@ function getChatDocument(
 }
 
 // =========================================================
-// SEND MESSAGE
+// MESSAGE FORMATTER
 // =========================================================
-// يدعم:
-// - نص
-// - صورة
-// - Voice
-// - Reply
+
+function formatMessage(
+  messageDoc: any
+): FirestoreChatMessage {
+  const data = messageDoc.data();
+
+  return {
+    id: messageDoc.id,
+
+    text:
+      data.text ?? "",
+
+    imageUrl:
+      data.imageUrl ?? null,
+
+    voiceUrl:
+      data.voiceUrl ?? null,
+
+    voiceDuration:
+      data.voiceDuration ?? null,
+
+    userId:
+      data.userId ?? "",
+
+    type:
+      data.type ?? "text",
+
+    createdAt:
+      data.createdAt ?? null,
+
+    updatedAt:
+      data.updatedAt ?? null,
+
+    edited:
+      data.edited ?? false,
+
+    deleted:
+      data.deleted ?? false,
+
+    replyTo:
+      data.replyTo ?? null,
+
+    reactions:
+      data.reactions ?? {},
+
+    seenBy:
+      data.seenBy ?? {},
+  };
+}
+
+// =========================================================
+// SEND MESSAGE
 // =========================================================
 
 export async function sendMessage(
@@ -141,10 +183,7 @@ export async function sendMessage(
     replyTo?: ReplyToMessage | null;
   }
 ): Promise<string> {
-  if (
-    !myUid ||
-    !friendUid
-  ) {
+  if (!myUid || !friendUid) {
     throw new Error(
       "Missing user ID"
     );
@@ -154,16 +193,13 @@ export async function sendMessage(
     text.trim();
 
   const voiceUrl =
-    options?.voiceUrl ??
-    null;
+    options?.voiceUrl ?? null;
 
   const voiceDuration =
-    options?.voiceDuration ??
-    null;
+    options?.voiceDuration ?? null;
 
   const replyTo =
-    options?.replyTo ??
-    null;
+    options?.replyTo ?? null;
 
   let type: MessageType =
     "text";
@@ -173,9 +209,13 @@ export async function sendMessage(
     voiceUrl
   ) {
     type = "mixed";
-  } else if (imageUrl) {
+  } else if (
+    imageUrl
+  ) {
     type = "image";
-  } else if (voiceUrl) {
+  } else if (
+    voiceUrl
+  ) {
     type = "voice";
   }
 
@@ -232,7 +272,7 @@ export async function sendMessage(
     );
 
   // =======================================================
-  // UPDATE CHAT SUMMARY
+  // CHAT SUMMARY
   // =======================================================
 
   const chatRef =
@@ -240,6 +280,14 @@ export async function sendMessage(
       myUid,
       friendUid
     );
+
+  const lastMessageText =
+    cleanText ||
+    (imageUrl
+      ? "📷 صورة"
+      : voiceUrl
+      ? "🎙️ رسالة صوتية"
+      : "");
 
   await setDoc(
     chatRef,
@@ -250,15 +298,17 @@ export async function sendMessage(
       ],
 
       lastMessage: {
+        messageId:
+          messageRef.id,
+
         text:
-          cleanText ||
-          (imageUrl
-            ? "📷 صورة"
-            : voiceUrl
-            ? "🎙️ رسالة صوتية"
-            : ""),
-        senderId: myUid,
+          lastMessageText,
+
+        senderId:
+          myUid,
+
         type,
+
         updatedAt:
           serverTimestamp(),
       },
@@ -310,8 +360,6 @@ export async function sendVoiceMessage(
 // =========================================================
 // LISTEN TO MESSAGES
 // =========================================================
-// realtime listener
-// =========================================================
 
 export function listenToMessages(
   myUid: string,
@@ -333,7 +381,7 @@ export function listenToMessages(
       friendUid
     );
 
-  const q =
+  const messagesQuery =
     query(
       messagesRef,
       orderBy(
@@ -343,77 +391,14 @@ export function listenToMessages(
     );
 
   return onSnapshot(
-    q,
+    messagesQuery,
     (snapshot) => {
       const messages =
         snapshot.docs.map(
-          (
-            messageDoc
-          ) => {
-            const data =
-              messageDoc.data();
-
-            return {
-              id: messageDoc.id,
-
-              text:
-                data.text ??
-                "",
-
-              imageUrl:
-                data.imageUrl ??
-                null,
-
-              voiceUrl:
-                data.voiceUrl ??
-                null,
-
-              voiceDuration:
-                data.voiceDuration ??
-                null,
-
-              userId:
-                data.userId ??
-                "",
-
-              type:
-                data.type ??
-                "text",
-
-              createdAt:
-                data.createdAt ??
-                null,
-
-              updatedAt:
-                data.updatedAt ??
-                null,
-
-              edited:
-                data.edited ??
-                false,
-
-              deleted:
-                data.deleted ??
-                false,
-
-              replyTo:
-                data.replyTo ??
-                null,
-
-              reactions:
-                data.reactions ??
-                {},
-
-              seenBy:
-                data.seenBy ??
-                {},
-            };
-          }
+          formatMessage
         );
 
-      callback(
-        messages
-      );
+      callback(messages);
     },
     (error) => {
       console.error(
@@ -425,13 +410,15 @@ export function listenToMessages(
 }
 
 // =========================================================
-// GET MESSAGES ONCE
+// GET MESSAGES
 // =========================================================
 
 export async function getMessages(
   myUid: string,
   friendUid: string
-): Promise<FirestoreChatMessage[]> {
+): Promise<
+  FirestoreChatMessage[]
+> {
   if (
     !myUid ||
     !friendUid
@@ -445,7 +432,7 @@ export async function getMessages(
       friendUid
     );
 
-  const q =
+  const messagesQuery =
     query(
       messagesRef,
       orderBy(
@@ -455,69 +442,12 @@ export async function getMessages(
     );
 
   const snapshot =
-    await getDocs(q);
+    await getDocs(
+      messagesQuery
+    );
 
   return snapshot.docs.map(
-    (messageDoc) => {
-      const data =
-        messageDoc.data();
-
-      return {
-        id: messageDoc.id,
-
-        text:
-          data.text ??
-          "",
-
-        imageUrl:
-          data.imageUrl ??
-          null,
-
-        voiceUrl:
-          data.voiceUrl ??
-          null,
-
-        voiceDuration:
-          data.voiceDuration ??
-          null,
-
-        userId:
-          data.userId ??
-          "",
-
-        type:
-          data.type ??
-          "text",
-
-        createdAt:
-          data.createdAt ??
-          null,
-
-        updatedAt:
-          data.updatedAt ??
-          null,
-
-        edited:
-          data.edited ??
-          false,
-
-        deleted:
-          data.deleted ??
-          false,
-
-        replyTo:
-          data.replyTo ??
-          null,
-
-        reactions:
-          data.reactions ??
-          {},
-
-        seenBy:
-          data.seenBy ??
-          {},
-      };
-    }
+    formatMessage
   );
 }
 
@@ -564,8 +494,7 @@ export async function editMessage(
     existing.data();
 
   if (
-    data.userId !==
-    myUid
+    data.userId !== myUid
   ) {
     throw new Error(
       "You can only edit your own messages"
@@ -583,9 +512,6 @@ export async function editMessage(
         serverTimestamp(),
     }
   );
-
-  // تحديث آخر رسالة إذا كانت هذه
-  // هي آخر رسالة في المحادثة.
 
   const chatRef =
     getChatDocument(
@@ -616,6 +542,9 @@ export async function editMessage(
             cleanText,
 
           "lastMessage.updatedAt":
+            serverTimestamp(),
+
+          updatedAt:
             serverTimestamp(),
         }
       );
@@ -654,16 +583,12 @@ export async function deleteMessage(
     existing.data();
 
   if (
-    data.userId !==
-    myUid
+    data.userId !== myUid
   ) {
     throw new Error(
       "You can only delete your own messages"
     );
   }
-
-  // Soft delete حتى ما نخرب
-  // replies والـ message history.
 
   await updateDoc(
     messageRef,
@@ -682,12 +607,49 @@ export async function deleteMessage(
         serverTimestamp(),
     }
   );
+
+  // Update chat preview if needed
+  const chatRef =
+    getChatDocument(
+      myUid,
+      friendUid
+    );
+
+  const chatSnapshot =
+    await getDoc(
+      chatRef
+    );
+
+  if (
+    chatSnapshot.exists()
+  ) {
+    const chatData =
+      chatSnapshot.data();
+
+    if (
+      chatData.lastMessage
+        ?.messageId ===
+      messageId
+    ) {
+      await updateDoc(
+        chatRef,
+        {
+          "lastMessage.text":
+            "🗑️ رسالة محذوفة",
+
+          "lastMessage.updatedAt":
+            serverTimestamp(),
+
+          updatedAt:
+            serverTimestamp(),
+        }
+      );
+    }
+  }
 }
 
 // =========================================================
-// DELETE MESSAGE PERMANENTLY
-// =========================================================
-// نستخدمها فقط إذا احتجنا حذف نهائي.
+// PERMANENT DELETE MESSAGE
 // =========================================================
 
 export async function permanentlyDeleteMessage(
@@ -717,8 +679,7 @@ export async function permanentlyDeleteMessage(
     existing.data();
 
   if (
-    data.userId !==
-    myUid
+    data.userId !== myUid
   ) {
     throw new Error(
       "You can only delete your own messages"
@@ -767,11 +728,9 @@ export async function reactToMessage(
   const data =
     snapshot.data();
 
-  const reactions =
-    {
-      ...(data.reactions ??
-        {}),
-    };
+  const reactions = {
+    ...(data.reactions ?? {}),
+  };
 
   if (
     reactions[myUid] ===
@@ -834,11 +793,9 @@ export async function markMessageAsRead(
   const data =
     snapshot.data();
 
-  const seenBy =
-    {
-      ...(data.seenBy ??
-        {}),
-    };
+  const seenBy = {
+    ...(data.seenBy ?? {}),
+  };
 
   seenBy[myUid] =
     true;
@@ -884,23 +841,28 @@ export async function markAllMessagesAsRead(
   const batch =
     writeBatch(db);
 
+  let hasUpdates = false;
+
   snapshot.docs.forEach(
     (messageDoc) => {
       const data =
         messageDoc.data();
 
       if (
-        data.userId ===
-        myUid
+        data.userId === myUid
       ) {
         return;
       }
 
-      const seenBy =
-        {
-          ...(data.seenBy ??
-            {}),
-        };
+      const seenBy = {
+        ...(data.seenBy ?? {}),
+      };
+
+      if (
+        seenBy[myUid]
+      ) {
+        return;
+      }
 
       seenBy[myUid] =
         true;
@@ -911,16 +873,19 @@ export async function markAllMessagesAsRead(
           seenBy,
         }
       );
+
+      hasUpdates =
+        true;
     }
   );
 
-  await batch.commit();
+  if (hasUpdates) {
+    await batch.commit();
+  }
 }
 
 // =========================================================
-// CLEAR CHAT
-// =========================================================
-// حذف جميع رسائل محادثة واحدة.
+// CLEAR ONE CHAT
 // =========================================================
 
 export async function clearChat(
@@ -945,50 +910,35 @@ export async function clearChat(
       messagesRef
     );
 
-  if (snapshot.empty) {
-    return;
-  }
+  if (!snapshot.empty) {
+    const docs =
+      snapshot.docs;
 
-  // Firestore batch maximum = 500
-  // لذلك نقسم الرسائل إلى batches.
+    for (
+      let i = 0;
+      i < docs.length;
+      i += 450
+    ) {
+      const batch =
+        writeBatch(db);
 
-  const chunks: typeof snapshot.docs[] =
-    [];
-
-  for (
-    let i = 0;
-    i <
-    snapshot.docs.length;
-    i += 500
-  ) {
-    chunks.push(
-      snapshot.docs.slice(
-        i,
-        i + 500
-      )
-    );
-  }
-
-  for (
-    const chunk of chunks
-  ) {
-    const batch =
-      writeBatch(db);
-
-    chunk.forEach(
-      (messageDoc) => {
-        batch.delete(
-          messageDoc.ref
+      const chunk =
+        docs.slice(
+          i,
+          i + 450
         );
-      }
-    );
 
-    await batch.commit();
+      chunk.forEach(
+        (messageDoc) => {
+          batch.delete(
+            messageDoc.ref
+          );
+        }
+      );
+
+      await batch.commit();
+    }
   }
-
-  // حذف ملخص المحادثة
-  // مع إبقاء document فارغاً
-  // إذا احتجناه لاحقاً.
 
   const chatRef =
     getChatDocument(
@@ -999,7 +949,8 @@ export async function clearChat(
   await setDoc(
     chatRef,
     {
-      lastMessage: null,
+      lastMessage:
+        null,
 
       updatedAt:
         serverTimestamp(),
@@ -1037,7 +988,8 @@ export async function archiveChat(
   await setDoc(
     archiveRef,
     {
-      userId: friendUid,
+      userId:
+        friendUid,
 
       archivedAt:
         serverTimestamp(),
@@ -1105,11 +1057,10 @@ export function listenToArchivedChats(
     archivedRef,
     (snapshot) => {
       const ids =
-        snapshot.docs
-          .map(
-            (archiveDoc) =>
-              archiveDoc.id
-          );
+        snapshot.docs.map(
+          (archiveDoc) =>
+            archiveDoc.id
+        );
 
       callback(ids);
     },
@@ -1181,15 +1132,22 @@ export async function clearAllChats(
       )
     );
 
-  await Promise.all(
-    uniqueFriendUids.map(
-      (friendUid) =>
-        clearChat(
-          myUid,
-          friendUid
-        )
-    )
-  );
+  for (
+    const friendUid of
+    uniqueFriendUids
+  ) {
+    try {
+      await clearChat(
+        myUid,
+        friendUid
+      );
+    } catch (error) {
+      console.error(
+        `Failed to clear chat with ${friendUid}:`,
+        error
+      );
+    }
+  }
 }
 
 // =========================================================
@@ -1215,7 +1173,7 @@ export async function getLastMessage(
       friendUid
     );
 
-  const q =
+  const messagesQuery =
     query(
       messagesRef,
       orderBy(
@@ -1226,73 +1184,15 @@ export async function getLastMessage(
     );
 
   const snapshot =
-    await getDocs(q);
+    await getDocs(
+      messagesQuery
+    );
 
-  if (
-    snapshot.empty
-  ) {
+  if (snapshot.empty) {
     return null;
   }
 
-  const messageDoc =
-    snapshot.docs[0];
-
-  const data =
-    messageDoc.data();
-
-  return {
-    id: messageDoc.id,
-
-    text:
-      data.text ??
-      "",
-
-    imageUrl:
-      data.imageUrl ??
-      null,
-
-    voiceUrl:
-      data.voiceUrl ??
-      null,
-
-    voiceDuration:
-      data.voiceDuration ??
-      null,
-
-    userId:
-      data.userId ??
-      "",
-
-    type:
-      data.type ??
-      "text",
-
-    createdAt:
-      data.createdAt ??
-      null,
-
-    updatedAt:
-      data.updatedAt ??
-      null,
-
-    edited:
-      data.edited ??
-      false,
-
-    deleted:
-      data.deleted ??
-      false,
-
-    replyTo:
-      data.replyTo ??
-      null,
-
-    reactions:
-      data.reactions ??
-      {},
-
-    seenBy:
-      data.seenBy ??
-      {},
-  };
+  return formatMessage(
+    snapshot.docs[0]
+  );
 }
